@@ -1,0 +1,43 @@
+name: Build and Push Docker Image
+
+on:
+  push:
+    branches: [ main ] # mainブランチにプッシュされたら実行
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/app:latest
+  deploy:
+      needs: build-and-push
+      runs-on: self-hosted
+      steps:
+        - name: Pull new image and restart
+          run: |
+            # デプロイ用ディレクトリに移動
+            cd /home/your-user/project-folder
+            # 最新のイメージをプル
+            docker compose -f docker-compose.prod.yml pull
+            # コンテナを再起動（DBは維持しつつアプリだけ更新）
+            docker compose -f docker-compose.prod.yml up -d
