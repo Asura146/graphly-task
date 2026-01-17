@@ -1,0 +1,52 @@
+name: Build and Push Docker Image
+
+on:
+  push:
+    branches: [ "**" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare Docker Metadata
+        id: meta
+        run: |
+          # リポジトリ名を小文字に変換
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          # ブランチ名を小文字に変換
+          BRANCH_LOWER=$(echo "${GITHUB_REF#refs/heads/}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9.]/-/g')
+          
+          echo "repo=${REPO_LOWER}" >> $GITHUB_OUTPUT
+          echo "branch=${BRANCH_LOWER}" >> $GITHUB_OUTPUT
+        
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/${{ steps.meta.outputs.repo }}/app:${{ steps.meta.outputs.branch }}
+            ${{ github.ref == 'refs/heads/main' && format('ghcr.io/{0}/app:latest', steps.meta.outputs.repo) || '' }}
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: self-hosted
+    steps:
+      - name: Pull new image and restart
+        run: |
+          cd /home/graphly/graphly-task
+          docker compose -f docker-compose.prod.yml pull
+          docker compose -f docker-compose.prod.yml up -d
