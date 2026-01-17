@@ -2,7 +2,7 @@ name: Build and Push Docker Image
 
 on:
   push:
-    branches: [ main ] # mainブランチにプッシュされたら実行
+    branches: [ main ]
 
 jobs:
   build:
@@ -30,14 +30,11 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}/app:latest
   deploy:
-      needs: build-and-push
+      needs: build
       runs-on: self-hosted
       steps:
         - name: Pull new image and restart
           run: |
-            # デプロイ用ディレクトリに移動
-            cd /home/your-user/project-folder
-            # 最新のイメージをプル
+            cd /home/graphly/graphly-task
             docker compose -f docker-compose.prod.yml pull
-            # コンテナを再起動（DBは維持しつつアプリだけ更新）
             docker compose -f docker-compose.prod.yml up -d
