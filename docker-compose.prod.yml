@@ -1,8 +1,7 @@
 services:
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    app:
+    image: ghcr.io/asura146/graphly-task/app:latest
     restart: always
     environment:
       - DATABASE_URL=${DATABASE_URL}
