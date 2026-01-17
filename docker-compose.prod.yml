@@ -1,6 +1,5 @@
 services:
   app:
-    app:
     image: ghcr.io/asura146/graphly-task/app:latest
     restart: always
     environment:
