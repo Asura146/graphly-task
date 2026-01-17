@@ -13,10 +13,16 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - name: Get branch name
-        shell: bash
-        run: echo "branch=${GITHUB_REF#refs/heads/}" | tr '[:upper:]' '[:lower:]' >> $GITHUB_OUTPUT
-        id: extract_branch
+      - name: Prepare Docker Metadata
+        id: meta
+        run: |
+          # リポジトリ名を小文字に変換
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          # ブランチ名を小文字に変換
+          BRANCH_LOWER=$(echo "${GITHUB_REF#refs/heads/}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9.]/-/g')
+          
+          echo "repo=${REPO_LOWER}" >> $GITHUB_OUTPUT
+          echo "branch=${BRANCH_LOWER}" >> $GITHUB_OUTPUT
         
 
       - name: Login to GitHub Container Registry
@@ -32,8 +38,8 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}/app:${{ steps.extract_branch.outputs.branch }}
-            ${{ github.ref == 'refs/heads/main' && format('ghcr.io/{0}/app:latest', github.repository) || '' }}
+            ghcr.io/${{ steps.meta.outputs.repo }}/app:${{ steps.meta.outputs.branch }}
+            ${{ github.ref == 'refs/heads/main' && format('ghcr.io/{0}/app:latest', steps.meta.outputs.repo) || '' }}
   deploy:
     needs: build
     if: github.ref == 'refs/heads/main'
