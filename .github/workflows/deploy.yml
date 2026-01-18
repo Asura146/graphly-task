@@ -45,8 +45,25 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: self-hosted
     steps:
+      # Runner(LXC)に最新のソースコードをチェックアウト
+      - uses: actions/checkout@v4
+
+      # マイグレーションに必要な依存関係をインストール
+      - name: Install dependencies
+        run: npm install
+
+      # アプリの更新（イメージのプルと再起動）
       - name: Pull new image and restart
         run: |
+          # アプリ実行ディレクトリへ移動
+          mkdir -p /home/graphly/graphly-task
           cd /home/graphly/graphly-task
+          # Git上の最新のdocker-compose.prod.ymlを配置
+          cp $GITHUB_WORKSPACE/docker-compose.prod.yml .
           docker compose -f docker-compose.prod.yml pull
           docker compose -f docker-compose.prod.yml up -d
+
+      # データベースの自動マイグレーション
+      - name: Run Database Migration
+        run: |
+          DATABASE_URL=${{ secrets.DATABASE_URL_LOCAL }} npx drizzle-kit push
