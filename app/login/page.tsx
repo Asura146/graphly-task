@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { Button } from "@heroui/button";
 import { Input } from "@heroui/input";
@@ -12,6 +13,8 @@ export default function LoginPage() {
     const [password, setPassword] = useState("");
     const [name, setName] = useState("");
 
+    const router = useRouter();
+
     //メール・パスワードで新規登録
     const handleSignUp = async () => {
         await authClient.signUp.email({
@@ -20,7 +23,10 @@ export default function LoginPage() {
             name,
         }, {
             onRequest: () => console.log("登録中..."),
-            onSuccess: () => alert("登録成功！"),
+            onSuccess: () => {
+                router.push("/dashboard");
+                router.refresh();
+            },
             onError: (ctx) => alert(ctx.error.message),
         });
     };
@@ -31,7 +37,10 @@ export default function LoginPage() {
             email,
             password,
         }, {
-            onSuccess: () => alert("ログイン成功！"),
+            onSuccess: () => {
+                router.push("/dashboard");
+                router.refresh();
+            },
             onError: (ctx) => alert(ctx.error.message),
         });
     };
