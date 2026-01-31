@@ -9,6 +9,8 @@ export const user = pgTable("user", {
   image: text("image"),
   createdAt: timestamp("created_at").notNull(),
   updatedAt: timestamp("updated_at").notNull(),
+  role: text("role"),
+  banned: boolean("banned"),
 });
 
 // 2. セッションテーブル
@@ -22,7 +24,7 @@ export const session = pgTable("session", {
   userAgent: text("user_agent"),
   userId: text("user_id")
       .notNull()
-      .references(() => user.id),
+      .references(() => user.id, { onDelete: "cascade" }),
 });
 
 // 3. アカウントテーブル (Googleログインやパスワード情報を保持)
@@ -32,7 +34,7 @@ export const account = pgTable("account", {
   providerId: text("provider_id").notNull(),
   userId: text("user_id")
       .notNull()
-      .references(() => user.id),
+      .references(() => user.id,{ onDelete: "cascade"}),
   accessToken: text("access_token"),
   refreshToken: text("refresh_token"),
   idToken: text("id_token"),
