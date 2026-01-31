@@ -1,13 +1,9 @@
-import { Hono } from 'hono';
-import { db } from '@/db';
-import { tasks } from '@/db/schema';
+import { Hono } from "hono";
+import { authRoute } from "./auth";
 
-const app = new Hono().basePath('/api');
+const app = new Hono().basePath("/api");
 
-const route = app.get('/tasks', async (c) => {
-  const allTasks = await db.select().from(tasks);
-  return c.json(allTasks);
-});
+const routes = app.route("/auth", authRoute);
 
-export type AppType = typeof route;
 export default app;
+export type AppType = typeof routes;
