@@ -57,7 +57,7 @@ export default function LoginPage() {
                         <form className="flex flex-col gap-4">
                             <Input type="email" label="Email" onChange={(e) => setEmail(e.target.value)} />
                             <Input type="password" label="Password" onChange={(e) => setPassword(e.target.value)} />
-                            <Button onPress={handleSignIn}>ログイン</Button>
+                            <Button onPress={handleSignIn} className="bg-black text-white" >ログイン</Button>
                         </form>
                     </Tab>
                     <Tab title="新規登録">
@@ -65,7 +65,7 @@ export default function LoginPage() {
                             <Input type="text" label="Name" onChange={(e) => setName(e.target.value)} />
                             <Input type="email" label="Email" onChange={(e) => setEmail(e.target.value)} />
                             <Input type="password" label="Password" onChange={(e) => setPassword(e.target.value)} />
-                            <Button onPress={handleSignUp}>新規登録</Button>
+                            <Button onPress={handleSignUp} className="bg-black text-white">新規登録</Button>
                         </form>
                     </Tab>
                 </Tabs>
