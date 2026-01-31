@@ -9,8 +9,10 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@heroui/react": "^2.8.8",
     "better-auth": "^1.4.6",
     "drizzle-orm": "^0.45.1",
+    "framer-motion": "^12.29.2",
     "hono": "^4.11.3",
     "next": "^16.1.6",
     "postgres": "^3.4.8",
