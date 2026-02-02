@@ -21,7 +21,8 @@ export default function FlipCard({
 }: FlipCardProps) {
     const [isFlipped, setIsFlipped] = useState(false);
 
-    const handleFlip = () => {
+    const handleFlip = (e: React.MouseEvent) => {
+        e.stopPropagation();
         setIsFlipped(!isFlipped);
     };
 
@@ -30,13 +31,24 @@ export default function FlipCard({
         <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 border-t-2 border-dashed border-gray-400 z-20 pointer-events-none" />
     );
 
+    // 反転ボタン
+    const FlipButton = () => (
+        <button 
+            onClick={handleFlip}
+            className="absolute bottom-3 right-3 z-50 p-2 rounded-full bg-white/90 shadow-sm border border-gray-200 text-gray-600 hover:bg-gray-100 transition-colors"
+        >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3"/>
+            </svg>
+        </button>
+    );
+
     const maskClass = "ticket-mask";
 
     return (
         <div
-            className="group perspective-1000 cursor-pointer"
+            className="group perspective-1000"
             style={{ width, height }}
-            onClick={handleFlip}
         >
             <div
                 className={`relative w-full h-full transition-transform duration-500 transform-style-3d ${
@@ -46,6 +58,7 @@ export default function FlipCard({
                 {/* 表面 */}
                 <div className={`absolute w-full h-full backface-hidden bg-white rounded-xl shadow-lg border border-gray-200 flex flex-col overflow-hidden ${maskClass}`}>
                     <PerforationLine />
+                    <FlipButton />
                     
                     {/* 上段セクション*/}
                     <div className="flex-1 w-full flex flex-col">
@@ -63,13 +76,14 @@ export default function FlipCard({
                     </div>
 
                     {/* 下段セクション */}
-                    <div className="flex-1 w-full flex flex-col justify-center items-center p-6 text-center relative z-10">
+                    <div className="flex-1 w-full flex flex-col justify-center items-center text-center relative z-10">
                         {frontBottomContent}
                     </div>
                 </div>
 
                 {/* 裏面 */}
-                <div className={`absolute w-full h-full backface-hidden rotate-y-180 bg-gray-50 rounded-xl shadow-lg border border-gray-200 p-6 flex flex-col justify-center items-center overflow-hidden ${maskClass}`}>
+                <div className={`absolute w-full h-full backface-hidden rotate-y-180 bg-gray-800 rounded-xl shadow-lg border border-gray-200 p-6 flex flex-col overflow-hidden ${maskClass}`}>
+                    <FlipButton />
                     {backContent}
                 </div>
             </div>
