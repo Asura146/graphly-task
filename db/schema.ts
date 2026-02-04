@@ -1,4 +1,15 @@
-import { pgTable, text, timestamp, boolean } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  text,
+  timestamp,
+  boolean,
+  varchar,
+  integer,
+  doublePrecision,
+  primaryKey,
+  unique,
+} from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
 
 // 1. ユーザーテーブル
 export const user = pgTable("user", {
@@ -55,3 +66,83 @@ export const verification = pgTable("verification", {
   createdAt: timestamp("created_at"),
   updatedAt: timestamp("updated_at"),
 });
+
+// 5. Teams Table ---
+export const teams = pgTable("teams", {
+  id: varchar("id", { length: 255 }).primaryKey(), // cuidやuuidを想定
+  name: text("name").notNull(),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// 6. Team Members Table (中間テーブル) ---
+export const teamMembers = pgTable("team_members", {
+  id: varchar("id", { length: 255 }).primaryKey(),
+  teamId: varchar("team_id", { length: 255 })
+    .notNull()
+    .references(() => teams.id, { onDelete: "cascade" }),
+  userId: varchar("user_id", { length: 255 })
+    .notNull(), // better-authのuser.idを参照
+  role: varchar("role", { length: 50 }).default("MEMBER").notNull(), // ADMIN, MEMBER
+  joinedAt: timestamp("joined_at").defaultNow().notNull(),
+});
+
+// 7. Tasks Table ---
+export const tasks = pgTable("tasks", {
+  id: varchar("id", { length: 255 }).primaryKey(),
+  // teamIdがnullの場合は「個人タスク」として扱う
+  teamId: varchar("team_id", { length: 255 })
+    .references(() => teams.id, { onDelete: "cascade" }),
+  
+  creatorId: varchar("creator_id", { length: 255 }).notNull(), // 作成者
+  assigneeId: varchar("assignee_id", { length: 255 }), // 担当者
+
+  title: text("title").notNull(),
+  description: text("description"), // チケット裏面の詳細
+  status: varchar("status", { length: 50 }).default("TODO").notNull(), // TODO, IN_PROGRESS, DONE
+  dueDate: timestamp("due_date"),
+
+  // ReactFlow用の座標データ
+  positionX: doublePrecision("position_x").default(0).notNull(),
+  positionY: doublePrecision("position_y").default(0).notNull(),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// 8. Task Dependencies Table (自己参照多対多) ---
+export const taskDependencies = pgTable("task_dependencies", {
+  id: varchar("id", { length: 255 }).primaryKey(),
+  predecessorId: varchar("predecessor_id", { length: 255 })
+    .notNull()
+    .references(() => tasks.id, { onDelete: "cascade" }),
+  successorId: varchar("successor_id", { length: 255 })
+    .notNull()
+    .references(() => tasks.id, { onDelete: "cascade" }),
+}, (t) => [
+  // 依存関係の重複防止（配列形式）
+  unique().on(t.predecessorId, t.successorId),
+]);
+
+// --- Relations (Drizzle Relation API) ---
+// クエリを書きやすくするためのリレーション定義
+
+export const taskRelations = relations(tasks, ({ one, many }) => ({
+  team: one(teams, { fields: [tasks.teamId], references: [teams.id] }),
+  dependencies: many(taskDependencies, { relationName: "successor" }), // 自分が後続のケース
+  precedents: many(taskDependencies, { relationName: "predecessor" }), // 自分が先行のケース
+}));
+
+export const taskDependencyRelations = relations(taskDependencies, ({ one }) => ({
+  predecessor: one(tasks, {
+    fields: [taskDependencies.predecessorId],
+    references: [tasks.id],
+    relationName: "predecessor",
+  }),
+  successor: one(tasks, {
+    fields: [taskDependencies.successorId],
+    references: [tasks.id],
+    relationName: "successor",
+  }),
+}));
