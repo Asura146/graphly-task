@@ -7,6 +7,7 @@ interface TaskCardProps {
     team?: string;
     status?: TaskStatus;
     dueDate?: string;
+    backText?: string;
 }
 
 const statusConfig: Record<TaskStatus, { label: string; className: string }> = {
@@ -19,9 +20,10 @@ export default function TaskCard({
     title = "タイトル",
     team = "個人用",
     status = "todo",
-    dueDate = "--/--/--"
+    dueDate = "--/--/--",
+    backText = ""
 }: TaskCardProps) {
-    const currentStatus = statusConfig[status];
+    const currentStatus = statusConfig[status] || statusConfig.todo;
 
     // 残り日数の計算
     const getRemainingDays = (dateStr: string) => {
@@ -99,7 +101,7 @@ export default function TaskCard({
             backContent={
                 <div className="text-white px-2">
                     <h2 className="text-lg font-semibold mb-2">詳細</h2>
-                    <p>ここにバック面の内容が入ります。</p>
+                    <p>{backText}</p>
                 </div>
             }
             width="300px"
