@@ -84,11 +84,12 @@ export default function DashboardPage() {
                         {tasks.map((task) => (
                             <TaskCard
                                 key={task.id}
+                                id={task.id}
                                 title={task.title}
                                 team={task.teamId ? "チームタスク" : "個人用"}
                                 status={task.status || "todo"}
                                 dueDate={formatDate(task.dueDate)}
-                                backText={task.description || "詳細情報はありません。"}
+                                description={task.description || ""}
                             />
                         ))}
                     </div>
