@@ -16,6 +16,15 @@ const createTaskSchema = z.object({
   assigneeId: z.string().nullable().optional(),
   dueDate: z.string().optional(),
 });
+const updateTaskSchema = z.object({
+  title: z.string().min(1).optional(),
+  description: z.string().optional(),
+  status: z.enum(["TODO", "IN_PROGRESS", "DONE"]).optional(),
+  assigneeId: z.string().nullable().optional(),
+  dueDate: z.string().optional(),
+  positionX: z.number().optional(),
+  positionY: z.number().optional(),
+});
 
 export const taskRoute = new Hono<Env>() // index.tsと同じ型を渡す
   .get("/", async (c) => {
@@ -41,7 +50,7 @@ export const taskRoute = new Hono<Env>() // index.tsと同じ型を渡す
     return c.json(data);
   })
 
-  // 2. タスク新規作成
+  //タスク新規作成
   .post("/", zValidator("json", createTaskSchema), async (c) => {
     const user = c.get("user");
     if (!user) return c.json({ error: "Unauthorized" }, 401);
@@ -79,5 +88,63 @@ export const taskRoute = new Hono<Env>() // index.tsと同じ型を渡す
       return c.json(newTask, 201);
     } catch (error) {
       return c.json({ error: "Failed to create task" }, 500);
+    }
+  })
+
+
+  //タスク編集 (PATCH)
+  .patch("/:id", zValidator("json", updateTaskSchema), async (c) => {
+    const user = c.get("user");
+    const taskId = c.req.param("id");
+    if (!user) return c.json({ error: "Unauthorized" }, 401);
+
+    const body = c.req.valid("json");
+
+    try {
+      const [updatedTask] = await db
+        .update(tasks)
+        .set({
+          ...body,
+          dueDate: body.dueDate ? new Date(body.dueDate) : undefined,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(tasks.id, taskId),
+            // セキュリティ: 自分の個人タスクか、チームタスクであること
+            // (本来はチームメンバーかどうかの判定を入れるのがベスト)
+            or(eq(tasks.creatorId, user.id), eq(tasks.assigneeId, user.id))
+          )
+        )
+        .returning();
+
+      if (!updatedTask) return c.json({ error: "Task not found or forbidden" }, 404);
+      return c.json(updatedTask);
+    } catch (e) {
+      return c.json({ error: "Update failed" }, 500);
+    }
+  })
+
+  // タスク削除 (DELETE)
+  .delete("/:id", async (c) => {
+    const user = c.get("user");
+    const taskId = c.req.param("id");
+    if (!user) return c.json({ error: "Unauthorized" }, 401);
+
+    try {
+      const [deletedTask] = await db
+        .delete(tasks)
+        .where(
+          and(
+            eq(tasks.id, taskId),
+            eq(tasks.creatorId, user.id) // 作成者のみ削除可能とする
+          )
+        )
+        .returning();
+
+      if (!deletedTask) return c.json({ error: "Task not found or forbidden" }, 404);
+      return c.json({ success: true, id: deletedTask.id });
+    } catch (e) {
+      return c.json({ error: "Delete failed" }, 500);
     }
   });
