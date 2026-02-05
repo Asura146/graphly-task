@@ -20,7 +20,7 @@ import {
 import { Input, Textarea } from "@heroui/input";
 import { Button } from "@heroui/button";
 
-type TaskStatus = "todo" | "doing" | "done";
+type TaskStatus = "todo" | "in_progress" | "done";
 
 interface TaskCardProps {
     id?: string; // 編集・削除のためにIDが必要
@@ -33,7 +33,7 @@ interface TaskCardProps {
 
 const statusConfig: Record<TaskStatus, { label: string; className: string }> = {
     todo: { label: "未着手", className: "bg-gray-100 text-gray-600 border-gray-200" },
-    doing: { label: "進行中", className: "bg-blue-100 text-blue-600 border-blue-200" },
+    in_progress: { label: "進行中", className: "bg-blue-100 text-blue-600 border-blue-200" },
     done: { label: "完了", className: "bg-green-100 text-green-600 border-green-200" },
 };
 
@@ -59,7 +59,17 @@ export default function TaskCard({
     const [editDescription, setEditDescription] = useState(description || "");
     const [editDueDate, setEditDueDate] = useState("");
 
-    const currentStatus = statusConfig[status] || statusConfig.todo;
+    // ステータスの正規化処理
+    // APIから "IN_PROGRESS" (大文字) が来る場合や、"doing" などの表記揺れを吸収する
+    const normalizedStatus: TaskStatus = (() => {
+        if (!status) return "todo";
+        const s = status.toString().toLowerCase(); // 小文字化
+        if (s === "in_progress" || s === "doing") return "in_progress";
+        if (s === "done") return "done";
+        return "todo";
+    })();
+
+    const currentStatus = statusConfig[normalizedStatus] || statusConfig.todo;
 
     // 残り日数の計算（既存ロジック）
     const getRemainingDays = (dateStr: string) => {
@@ -161,6 +171,38 @@ export default function TaskCard({
         }
     };
 
+    // クイックステータス変更
+    const handleStatusChange = async (newStatus: TaskStatus) => {
+        if (!id) return;
+        
+        // サーバー用ステータスマップ
+        const serverStatusMap: Record<string, string> = {
+            todo: "TODO",
+            in_progress: "IN_PROGRESS", // キーを 'in_progress' に統一
+            done: "DONE",
+        };
+
+        try {
+            const res = await fetch(`/api/tasks/${id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    status: serverStatusMap[newStatus],
+                }),
+            });
+
+            if (!res.ok) throw new Error("Status update failed");
+
+            if (typeof window !== "undefined") {
+                window.dispatchEvent(new Event("taskCreated"));
+            }
+            router.refresh();
+        } catch (error) {
+            console.error(error);
+            alert("ステータス変更に失敗しました");
+        }
+    };
+
     return (
         <>
             <FripCard
@@ -204,11 +246,26 @@ export default function TaskCard({
                 }
                 frontBottomContent={
                     <div className="w-full px-6 flex justify-between items-end">
-                        <div className="flex flex-col gap-2 items-start">
-                            {/* ステータス表示 */}
-                            <span className={`px-5 py-1 rounded-full text-xs font-medium border ${currentStatus.className}`}>
-                                {currentStatus.label}
-                            </span>
+                        <div className="flex flex-col gap-2 items-start" onClick={(e) => e.stopPropagation()}>
+                            {/* ステータス表示 - クリックで変更可能なドロップダウンにする */}
+                            <Dropdown>
+                                <DropdownTrigger>
+                                    <button 
+                                        className={`px-5 py-1 rounded-full text-xs font-medium border transition-transform active:scale-95 ${currentStatus.className} hover:shadow-sm`}
+                                    >
+                                        {currentStatus.label}
+                                    </button>
+                                </DropdownTrigger>
+                                <DropdownMenu 
+                                    aria-label="Status Actions" 
+                                    onAction={(key) => handleStatusChange(key as TaskStatus)}
+                                >
+                                    <DropdownItem key="todo">未着手</DropdownItem>
+                                    <DropdownItem key="in_progress">進行中</DropdownItem>
+                                    <DropdownItem key="done">完了</DropdownItem>
+                                </DropdownMenu>
+                            </Dropdown>
+
                             {/* 期限表示 */}
                             <div className="flex items-center text-gray-700 text-sm font-semibold">
                                 <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -235,8 +292,8 @@ export default function TaskCard({
                 }
                 backContent={
                     <div className="text-white px-2 overflow-y-auto h-full w-full">
-                        <h2 className="text-lg font-semibold mb-2 text-gray-800">詳細</h2>
-                        <p className="text-gray-600 text-sm whitespace-pre-wrap">{ description || "詳細はありません"}</p>
+                        <h2 className="text-lg font-semibold mb-2 text-white">詳細</h2>
+                        <p className="text-white text-sm whitespace-pre-wrap">{ description || "詳細はありません"}</p>
                     </div>
                 }
                 width="300px"
