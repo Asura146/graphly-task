@@ -1,13 +1,36 @@
-import { Hono } from 'hono';
-import { db } from '@/db';
-import { tasks } from '@/db/schema';
+import { Hono } from "hono";
+import { authRoute } from "./auth";
+import { auth } from "@/lib/auth"
+import { taskRoute } from "./tasks";
 
-const app = new Hono().basePath('/api');
+export type Env = {
+    Variables: {
+      user: typeof auth.$Infer.Session.user | null;
+      session: typeof auth.$Infer.Session.session | null;
+    };
+  };
 
-const route = app.get('/tasks', async (c) => {
-  const allTasks = await db.select().from(tasks);
-  return c.json(allTasks);
-});
+const app = new Hono<Env>().basePath("/api");
+app.use("*", async (c, next) => {
+    // c.req.raw.headers を渡すことでCookie内のセッションを解析
+    const session = await auth.api.getSession({
+      headers: c.req.raw.headers,
+    });
+  
+    if (!session) {
+      c.set("user", null);
+      c.set("session", null);
+    } else {
+      c.set("user", session.user);
+      c.set("session", session.session);
+    }
+  
+    await next();
+  });
 
-export type AppType = typeof route;
+const routes = app
+.route("/auth", authRoute)
+.route("/tasks", taskRoute)
+
 export default app;
+export type AppType = typeof routes;
