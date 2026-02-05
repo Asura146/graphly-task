@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react"; // useCallbackを追加
 import TaskCard from "@/components/TaskCard";
 import CreateMyTask from "@/components/CreateMyTask";
+import { Divider } from "@heroui/react";
 
 // タスクの型定義
 interface Task {
@@ -11,7 +12,7 @@ interface Task {
     description: string | null;
     dueDate: string | null;
     teamId: string | null;
-    status?: "todo" | "doing" | "done";
+    status?: "todo" | "in_progress" | "done";
 }
 
 export default function DashboardPage() {
@@ -23,8 +24,16 @@ export default function DashboardPage() {
         try {
             const res = await fetch("/api/tasks");
             if (res.ok) {
-                const data = await res.json();
-                setTasks(data);
+                const data: Task[] = await res.json();
+                
+                // 期限が近い順にソート (nullは後ろへ)
+                const sortedData = data.sort((a, b) => {
+                    if (!a.dueDate) return 1;
+                    if (!b.dueDate) return -1;
+                    return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+                });
+                
+                setTasks(sortedData);
             }
         } catch (error) {
             console.error("Failed to fetch tasks", error);
@@ -69,6 +78,8 @@ export default function DashboardPage() {
                 </div>
                 
               </div>
+              <h1 className="text-lg font-medium mb-2">あなたのタスク一覧</h1>
+              <Divider className="mb-6" />
                 
                 {isLoading ? (
                     <div className="flex justify-center items-center py-20">
@@ -80,10 +91,13 @@ export default function DashboardPage() {
                         <p className="text-sm mt-2">ヘッダーの「＋タスクを追加」から作成できます。</p>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 place-items-center">
+                    <div className="flex overflow-x-auto grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 place-items-center">
                         {tasks.map((task) => (
+                          <div
+                            key={task.id}
+                            className="flex-shrink-0"
+                          >
                             <TaskCard
-                                key={task.id}
                                 id={task.id}
                                 title={task.title}
                                 team={task.teamId ? "チームタスク" : "個人用"}
@@ -91,6 +105,7 @@ export default function DashboardPage() {
                                 dueDate={formatDate(task.dueDate)}
                                 description={task.description || ""}
                             />
+                          </div>
                         ))}
                     </div>
                 )}
