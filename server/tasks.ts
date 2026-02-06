@@ -1,7 +1,7 @@
 // server/routes/tasks.ts
 import { Hono } from "hono";
 import { db } from "@/lib/db";
-import { tasks } from "@/db/schema";
+import { tasks, teams } from "@/db/schema"; // teams を追加
 import { eq, or, and, isNull, desc } from "drizzle-orm";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
@@ -37,9 +37,21 @@ export const taskRoute = new Hono<Env>() // index.tsと同じ型を渡す
 
     // あとはユーザーIDを使ってDBから取得
     const userId = user.id;
+    // selectで取得するフィールドを明示し、teamsと結合
     const data = await db
-      .select()
+      .select({
+        id: tasks.id,
+        title: tasks.title,
+        description: tasks.description,
+        dueDate: tasks.dueDate,
+        teamId: tasks.teamId,
+        status: tasks.status,
+        creatorId: tasks.creatorId,
+        assigneeId: tasks.assigneeId,
+        teamName: teams.name, // チーム名を取得
+      })
       .from(tasks)
+      .leftJoin(teams, eq(tasks.teamId, teams.id)) // チームテーブルと結合
       .where(
         or(
           eq(tasks.assigneeId, userId),

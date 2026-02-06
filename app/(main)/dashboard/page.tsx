@@ -18,6 +18,7 @@ interface Task {
     dueDate: string | null;
     teamId: string | null;
     status?: "todo" | "in_progress" | "done";
+    teamName?: string | null; // 追加: サーバーから返ってくるチーム名
 }
 type TeamsResponse = InferResponseType<typeof api.teams.$get, 200>;
 
@@ -133,7 +134,7 @@ export default function DashboardPage() {
                                 <TaskCard
                                     id={task.id}
                                     title={task.title}
-                                    team={task.teamId ? "チームタスク" : "個人用"}
+                                    team={task.teamName || (task.teamId ? "チームタスク" : "個人用")} // チーム名があれば表示
                                     status={task.status || "todo"}
                                     dueDate={formatDate(task.dueDate)}
                                     description={task.description || ""}
