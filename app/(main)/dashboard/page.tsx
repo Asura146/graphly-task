@@ -1,9 +1,13 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react"; // useCallbackを追加
+import { useEffect, useState, useCallback, use } from "react"; // useCallbackを追加
 import TaskCard from "@/components/TaskCard";
 import CreateMyTask from "@/components/CreateMyTask";
 import { Divider } from "@heroui/react";
+import {CreateTeam} from "@/components/CreateTeam";
+import { api } from "@/lib/hono";
+import { InferResponseType } from "hono/client";
+import { set } from "zod";
 
 // タスクの型定義
 interface Task {
@@ -14,10 +18,12 @@ interface Task {
     teamId: string | null;
     status?: "todo" | "in_progress" | "done";
 }
+type TeamsResponse = InferResponseType<typeof api.teams.$get,200>;
 
 export default function DashboardPage() {
     const [tasks, setTasks] = useState<Task[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [teams, setTeams] = useState<TeamsResponse>([]);
 
     // データ取得関数を定義
     const fetchTasks = useCallback(async () => {
@@ -59,6 +65,36 @@ export default function DashboardPage() {
             window.removeEventListener("taskCreated", handleTaskCreated);
         };
     }, [fetchTasks]);
+
+    // チームデータ取得関数を定義 (useCallbackを使用)
+    const fetchTeams = useCallback(async () => {
+        try {
+            const res = await api.teams.$get();
+            if (res.ok) {
+                const data = await res.json();
+                setTeams(data);
+            }
+        } catch (error) {
+            console.error("Failed to fetch teams", error);
+        }
+    }, []);
+
+    useEffect(() => {
+        // 初回ロード
+        fetchTeams();
+
+        // イベントハンドラー
+        const handleTeamCreated = () => {
+            fetchTeams();
+        };
+
+        // カスタムイベントを購読 ("teamCreated" イベント)
+        window.addEventListener("teamCreated", handleTeamCreated);
+
+        return () => {
+            window.removeEventListener("teamCreated", handleTeamCreated);
+        };
+    }, [fetchTeams]);
 
     // 日付フォーマット用関数
     const formatDate = (dateStr: string | null) => {
@@ -109,6 +145,26 @@ export default function DashboardPage() {
                         ))}
                     </div>
                 )}
+                <div className="flex">
+                    <h1 className="text-lg font-medium mb-2 pt-5">所属チーム一覧</h1>
+                    <div className="ml-auto mt-4 mb-6">
+                    <CreateTeam />
+                    </div>
+                </div>
+                <Divider className="mb-6" />
+                <div className="grid gap-4">
+                    {teams.map((team) => (
+                        <div key={team.id} className="p-4 border rounded shadow-sm">
+                        <h3 className="font-bold text-lg">{team.name}</h3>
+                        <p className="text-sm text-gray-500">{team.description}</p>
+                        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded mt-2 inline-block">
+                            役割: {team.role}
+                        </span>
+                        </div>
+                    ))}
+                    {teams.length === 0 && <p>所属しているチームはありません</p>}
+                </div>
+
             </div>
         </div>
     );
