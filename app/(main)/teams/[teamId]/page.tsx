@@ -28,7 +28,7 @@ interface TeamTask {
     description: string | null;
     status: "todo" | "in_progress" | "done";
     dueDate: string | null;
-    assigneeId: string | null; // 追加
+    assigneeId: string | null;
     assigneeName: string | null;
 }
 
@@ -67,6 +67,17 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
 
     useEffect(() => {
         fetchData();
+
+        // ★追加: タスク更新イベントを検知してリロード
+        const handleTaskUpdate = () => {
+            fetchData();
+        };
+
+        window.addEventListener("taskCreated", handleTaskUpdate);
+
+        return () => {
+            window.removeEventListener("taskCreated", handleTaskUpdate);
+        };
     }, [fetchData]);
 
     const formatDate = (dateStr: string | null) => {
@@ -76,11 +87,15 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
         return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
     };
 
+    // 未割り当てタスクの抽出
+    const unassignedTasks = tasks.filter(t => !t.assigneeId);
+
     if (isLoading) return <div className="flex justify-center py-20">読み込み中...</div>;
     if (!team) return <div className="p-8 text-center">チームが見つかりません</div>;
 
     return (
-        <div className="bg-gray-50 max-w-5xl mx-auto min-h-screen pt-24 px-6 pb-20">
+        <div className="bg-gray-50 max-w-6xl mx-auto min-h-screen pt-24 px-6 pb-20">
+            {/* ヘッダー */}
             <div className="mb-6">
                 <Button variant="light" className="mb-4 text-gray-500 pl-0 hover:text-gray-800" onPress={() => router.back()}>
                     ← 戻る
@@ -90,14 +105,19 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
                         <h1 className="text-3xl font-bold text-gray-800">{team.name}</h1>
                         <p className="text-gray-500 mt-2">{team.description || "説明はありません"}</p>
                     </div>
+                    <div className="flex items-center gap-2">
+                        {/* メンバー招待ボタン */}
+                        <AddTeamMember teamId={teamId} teamName={team.name} onSuccess={fetchData} />
+                    </div>
                 </div>
             </div>
 
             <Divider className="my-6" />
 
-            <div className="mb-10">
+            {/* 新規タスク作成・未割り当てエリア */}
+            <div className="mb-12">
                 <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-bold">チームタスク</h2>
+                    <h2 className="text-xl font-bold text-gray-700">未割り当てタスク</h2>
                     <CreateTeamTask 
                         teamId={teamId} 
                         members={members} 
@@ -105,23 +125,22 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
                     />
                 </div>
                 
-                {tasks.length === 0 ? (
-                    <div className="text-center py-10 text-gray-500 bg-white rounded-xl border border-dashed border-gray-300">
-                        タスクはまだありません
+                {unassignedTasks.length === 0 ? (
+                    <div className="text-center py-6 text-sm text-gray-400 bg-white rounded-xl border border-dashed border-gray-200">
+                        未割り当てのタスクはありません
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {tasks.map((task) => (
-                            <div key={task.id}>
+                    <div className="flex overflow-x-auto pb-4 gap-4">
+                        {unassignedTasks.map((task) => (
+                            <div key={task.id} className="flex-shrink-0">
                                 <TaskCard
                                     id={task.id}
                                     title={task.title}
                                     description={task.description}
-                                    team={task.assigneeName ? `担当: ${task.assigneeName}` : "担当: 未割り当て"}
+                                    team="担当: 未割り当て"
                                     status={task.status}
                                     dueDate={formatDate(task.dueDate)}
-                                    // 追加: 担当者情報とメンバー一覧を渡す
-                                    assigneeId={task.assigneeId}
+                                    assigneeId={null}
                                     members={members}
                                 />
                             </div>
@@ -130,33 +149,66 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
                 )}
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-xl font-bold flex items-center gap-2">
-                        チームメンバー
-                        <span className="bg-gray-100 text-gray-600 text-sm py-0.5 px-2 rounded-full">{members.length}</span>
-                    </h2>
-                    <AddTeamMember teamId={teamId} teamName={team.name} onSuccess={fetchData} />
-                </div>
+            {/* メンバー別タスク可視化エリア */}
+            <div className="flex flex-col gap-8">
+                <h2 className="text-xl font-bold text-gray-700">メンバーの進捗</h2>
+                
+                {members.map((member) => {
+                    // このメンバーが持っているタスクを抽出
+                    const memberTasks = tasks.filter(t => t.assigneeId === member.id);
+                    
+                    return (
+                        <div key={member.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                            <div className="flex flex-col md:flex-row gap-6">
+                                {/* 左側: メンバー情報 */}
+                                <div className="w-full md:w-64 flex-shrink-0 flex flex-col gap-2 border-b md:border-b-0 md:border-r border-gray-100 pb-4 md:pb-0 md:pr-4">
+                                    <User
+                                        name={member.name}
+                                        description={member.email}
+                                        avatarProps={{ src: member.image || undefined, size: "lg" }}
+                                        className="justify-start"
+                                    />
+                                    <div className="mt-2 flex flex-wrap gap-2">
+                                        <span className={`text-xs px-2 py-1 rounded border ${
+                                            member.role === 'ADMIN' ? 'bg-purple-50 text-purple-700 border-purple-100' : 'bg-gray-50 text-gray-600 border-gray-100'
+                                        }`}>
+                                            {member.role === 'ADMIN' ? '管理者' : 'メンバー'}
+                                        </span>
+                                        <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded border border-blue-100">
+                                            担当タスク: {memberTasks.length}件
+                                        </span>
+                                    </div>
+                                </div>
 
-                <div className="flex flex-col gap-2">
-                    {members.map((member) => (
-                        <div key={member.id} className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition-colors border-b border-gray-100 last:border-0">
-                            <User
-                                name={member.name}
-                                description={member.email}
-                                avatarProps={{ src: member.image || undefined, name: member.name.charAt(0) }}
-                            />
-                            <div className="flex items-center gap-4">
-                                <span className={`text-xs px-2 py-1 rounded border ${
-                                    member.role === 'ADMIN' ? 'bg-purple-100 text-purple-700 border-purple-200' : 'bg-gray-100 text-gray-600 border-gray-200'
-                                }`}>
-                                    {member.role === 'ADMIN' ? '管理者' : 'メンバー'}
-                                </span>
+                                {/* 右側: タスク一覧 (横スクロール) */}
+                                <div className="flex-1 overflow-x-auto">
+                                    {memberTasks.length === 0 ? (
+                                        <div className="h-full flex items-center justify-center text-gray-400 text-sm py-4">
+                                            割り当てられたタスクはありません
+                                        </div>
+                                    ) : (
+                                        <div className="flex gap-4 pb-2">
+                                            {memberTasks.map((task) => (
+                                                <div key={task.id} className="flex-shrink-0">
+                                                    <TaskCard
+                                                        id={task.id}
+                                                        title={task.title}
+                                                        description={task.description}
+                                                        team={`担当: ${member.name}`}
+                                                        status={task.status}
+                                                        dueDate={formatDate(task.dueDate)}
+                                                        assigneeId={member.id}
+                                                        members={members}
+                                                    />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
-                    ))}
-                </div>
+                    );
+                })}
             </div>
         </div>
     );
