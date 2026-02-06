@@ -19,8 +19,17 @@ import {
 } from "@heroui/modal";
 import { Input, Textarea } from "@heroui/input";
 import { Button } from "@heroui/button";
+// 追加: Select系のコンポーネント
+import { Select, SelectItem, Avatar } from "@heroui/react";
 
 type TaskStatus = "todo" | "in_progress" | "done";
+
+// 追加: メンバー情報の型定義
+export interface Member {
+    id: string;
+    name: string;
+    image?: string | null;
+}
 
 interface TaskCardProps {
     id?: string; // 編集・削除のためにIDが必要
@@ -29,6 +38,9 @@ interface TaskCardProps {
     team?: string;
     status?: TaskStatus;
     dueDate?: string;
+    // 追加: 担当者変更用のProps
+    assigneeId?: string | null; 
+    members?: Member[]; // これが渡された時だけ担当者変更UIを表示
 }
 
 const statusConfig: Record<TaskStatus, { label: string; className: string }> = {
@@ -44,6 +56,8 @@ export default function TaskCard({
     team = "個人用",
     status = "todo",
     dueDate = "--/--/--",
+    assigneeId = null,
+    members = [],
 }: TaskCardProps) {
     const router = useRouter();
     const { isOpen, onOpen, onOpenChange } = useDisclosure();
@@ -58,6 +72,8 @@ export default function TaskCard({
     const [editTitle, setEditTitle] = useState(title);
     const [editDescription, setEditDescription] = useState(description || "");
     const [editDueDate, setEditDueDate] = useState("");
+    // 追加: 担当者編集用state
+    const [editAssigneeId, setEditAssigneeId] = useState<string>(assigneeId || "");
 
     // ステータスの正規化処理
     // APIから "IN_PROGRESS" (大文字) が来る場合や、"doing" などの表記揺れを吸収する
@@ -123,6 +139,7 @@ export default function TaskCard({
     const handleOpenEdit = () => {
         setEditTitle(title);
         setEditDescription(description || ""); // 親から渡された description をここで入れ直す
+        setEditAssigneeId(assigneeId || ""); // 現在の担当者をセット
         
         if (dueDate && dueDate !== "--/--/--") {
             const formatted = dueDate.includes("/") ? dueDate.split("/").join("-") : dueDate;
@@ -153,6 +170,7 @@ export default function TaskCard({
                     title: editTitle,
                     description: editDescription,
                     dueDate: editDueDate || undefined,
+                    assigneeId: editAssigneeId || null, // 担当者情報を含める
                 }),
             });
 
@@ -314,6 +332,26 @@ export default function TaskCard({
                                         onValueChange={setEditTitle}
                                         isRequired
                                     />
+                                    
+                                    {/* メンバー一覧が渡されている場合のみ担当者選択を表示 */}
+                                    {members && members.length > 0 && (
+                                        <Select 
+                                            label="担当者"
+                                            placeholder="担当者を選択（任意）"
+                                            selectedKeys={editAssigneeId ? [editAssigneeId] : []}
+                                            onChange={(e) => setEditAssigneeId(e.target.value)}
+                                        >
+                                            {members.map((member) => (
+                                                <SelectItem key={member.id} textValue={member.name}>
+                                                    <div className="flex items-center gap-2">
+                                                        <Avatar alt={member.name} className="flex-shrink-0" size="sm" src={member.image || undefined} />
+                                                        <span className="text-small">{member.name}</span>
+                                                    </div>
+                                                </SelectItem>
+                                            ))}
+                                        </Select>
+                                    )}
+
                                     <Textarea
                                         label="詳細"
                                         value={editDescription}

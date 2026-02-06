@@ -28,6 +28,7 @@ interface TeamTask {
     description: string | null;
     status: "todo" | "in_progress" | "done";
     dueDate: string | null;
+    assigneeId: string | null; // 追加
     assigneeName: string | null;
 }
 
@@ -119,6 +120,9 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
                                     team={task.assigneeName ? `担当: ${task.assigneeName}` : "担当: 未割り当て"}
                                     status={task.status}
                                     dueDate={formatDate(task.dueDate)}
+                                    // 追加: 担当者情報とメンバー一覧を渡す
+                                    assigneeId={task.assigneeId}
+                                    members={members}
                                 />
                             </div>
                         ))}

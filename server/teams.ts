@@ -146,6 +146,7 @@ export const teamRoute = new Hono<Env>()
             status: tasks.status,
             dueDate: tasks.dueDate,
             createdAt: tasks.createdAt,
+            assigneeId: tasks.assigneeId, // 追加: 担当者IDを取得
             assigneeName: users.name, // 担当者名
             // assigneeImage: users.image, // 必要であれば
           })
