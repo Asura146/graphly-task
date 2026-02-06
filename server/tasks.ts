@@ -1,8 +1,8 @@
 // server/routes/tasks.ts
 import { Hono } from "hono";
 import { db } from "@/lib/db";
-import { tasks, teams } from "@/db/schema"; // teams を追加
-import { eq, or, and, isNull, desc } from "drizzle-orm";
+import { tasks, teams, teamMembers } from "@/db/schema"; 
+import { eq, or, and, isNull } from "drizzle-orm";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { nanoid } from "nanoid";
@@ -35,7 +35,6 @@ export const taskRoute = new Hono<Env>() // index.tsと同じ型を渡す
       return c.json({ error: "Unauthorized" }, 401);
     }
 
-    // あとはユーザーIDを使ってDBから取得
     const userId = user.id;
     // selectで取得するフィールドを明示し、teamsと結合
     const data = await db
@@ -113,6 +112,40 @@ export const taskRoute = new Hono<Env>() // index.tsと同じ型を渡す
     const body = c.req.valid("json");
 
     try {
+      // 1. まずターゲットとなるタスクを取得して権限チェックを行う
+      const [targetTask] = await db
+        .select()
+        .from(tasks)
+        .where(eq(tasks.id, taskId))
+        .limit(1);
+
+      if (!targetTask) return c.json({ error: "Task not found" }, 404);
+
+      let isAuthorized = false;
+
+      // 条件A: 自分が作成者、または現在の担当者であればOK
+      if (targetTask.creatorId === user.id || targetTask.assigneeId === user.id) {
+        isAuthorized = true;
+      } 
+      // 条件B: チームタスクの場合、そのチームのメンバーであればOK
+      else if (targetTask.teamId) {
+        const [member] = await db
+          .select()
+          .from(teamMembers)
+          .where(and(
+            eq(teamMembers.teamId, targetTask.teamId),
+            eq(teamMembers.userId, user.id)
+          ))
+          .limit(1);
+        
+        if (member) isAuthorized = true;
+      }
+
+      if (!isAuthorized) {
+        return c.json({ error: "Forbidden" }, 403);
+      }
+
+      // 2. 権限確認ができたら更新を実行
       const [updatedTask] = await db
         .update(tasks)
         .set({
@@ -120,19 +153,12 @@ export const taskRoute = new Hono<Env>() // index.tsと同じ型を渡す
           dueDate: body.dueDate ? new Date(body.dueDate) : undefined,
           updatedAt: new Date(),
         })
-        .where(
-          and(
-            eq(tasks.id, taskId),
-            // セキュリティ: 自分の個人タスクか、チームタスクであること
-            // (本来はチームメンバーかどうかの判定を入れるのがベスト)
-            or(eq(tasks.creatorId, user.id), eq(tasks.assigneeId, user.id))
-          )
-        )
+        .where(eq(tasks.id, taskId)) // ID指定のみで更新
         .returning();
 
-      if (!updatedTask) return c.json({ error: "Task not found or forbidden" }, 404);
       return c.json(updatedTask);
     } catch (e) {
+      console.error(e);
       return c.json({ error: "Update failed" }, 500);
     }
   })
