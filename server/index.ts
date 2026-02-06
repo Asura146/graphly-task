@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { authRoute } from "./auth";
 import { auth } from "@/lib/auth"
 import { taskRoute } from "./tasks";
+import { teamRoute } from "./teams";
 
 export type Env = {
     Variables: {
@@ -31,6 +32,7 @@ app.use("*", async (c, next) => {
 const routes = app
 .route("/auth", authRoute)
 .route("/tasks", taskRoute)
+.route("/teams",teamRoute)
 
 export default app;
 export type AppType = typeof routes;
