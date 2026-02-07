@@ -39,6 +39,9 @@ interface TeamTask {
     dueDate: string | null;
     assigneeId: string | null;
     assigneeName: string | null;
+    // ★追加
+    groupId: string | null;
+    groupTitle: string | null;
 }
 
 export default function TeamPage({ params }: { params: Promise<{ teamId: string }> }) {
@@ -190,6 +193,9 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
                                     dueDate={formatDate(task.dueDate)}
                                     assigneeId={null}
                                     members={members}
+                                    // ★追加
+                                    groupId={task.groupId}
+                                    groupName={task.groupTitle}
                                 />
                             </div>
                         ))}
@@ -247,6 +253,9 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
                                                         dueDate={formatDate(task.dueDate)}
                                                         assigneeId={member.id}
                                                         members={members}
+                                                        // ★追加
+                                                        groupId={task.groupId}
+                                                        groupName={task.groupTitle}
                                                     />
                                                 </div>
                                             ))}

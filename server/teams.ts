@@ -147,12 +147,17 @@ export const teamRoute = new Hono<Env>()
             status: tasks.status,
             dueDate: tasks.dueDate,
             createdAt: tasks.createdAt,
-            assigneeId: tasks.assigneeId, // 追加: 担当者IDを取得
-            assigneeName: users.name, // 担当者名
-            // assigneeImage: users.image, // 必要であれば
+            assigneeId: tasks.assigneeId, 
+            assigneeName: users.name, 
+            
+            // ★追加: グループ情報を取得
+            groupId: tasks.taskGroupId,
+            groupTitle: taskGroups.title,
           })
           .from(tasks)
-          .leftJoin(users, eq(tasks.assigneeId, users.id)) // 担当者がいない場合もあるのでLEFT JOIN
+          .leftJoin(users, eq(tasks.assigneeId, users.id)) 
+          // ★追加: taskGroups と JOIN
+          .leftJoin(taskGroups, eq(tasks.taskGroupId, taskGroups.id))
           .where(eq(tasks.teamId, teamId))
           .orderBy(desc(tasks.createdAt));
           
