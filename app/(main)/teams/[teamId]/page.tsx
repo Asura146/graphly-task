@@ -4,9 +4,11 @@ import { useEffect, useState, useCallback, use } from "react";
 import { AddTeamMember } from "@/components/AddTeamMember";
 import { CreateTeamTask } from "./components/CreateTeamTask";
 import TaskCard from "@/components/TaskCard";
+import { CreateTaskGroup } from "@/components/CreateTaskGroup"; // 追加
 import { Divider, User } from "@heroui/react";
 import { useRouter } from "next/navigation";
 import { Button } from "@heroui/button";
+import Link from "next/link"; // 追加
 
 interface Team {
     id: string;
@@ -20,6 +22,13 @@ interface Member {
     email: string;
     image: string | null;
     role: string;
+}
+
+// 追加: グループの型定義
+interface TaskGroup {
+    id: string;
+    title: string;
+    description: string | null;
 }
 
 interface TeamTask {
@@ -39,6 +48,7 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
     const [team, setTeam] = useState<Team | null>(null);
     const [members, setMembers] = useState<Member[]>([]);
     const [tasks, setTasks] = useState<TeamTask[]>([]);
+    const [groups, setGroups] = useState<TaskGroup[]>([]); // 追加
     const [isLoading, setIsLoading] = useState(true);
 
     const fetchData = useCallback(async () => {
@@ -58,6 +68,13 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
                 const taskData: TeamTask[] = await taskRes.json();
                 setTasks(taskData);
             }
+            
+            // ★追加: グループ一覧取得
+            const groupRes = await fetch(`/api/teams/${teamId}/task-groups`);
+            if (groupRes.ok) {
+                setGroups(await groupRes.json());
+            }
+
         } catch (error) {
             console.error(error);
         } finally {
@@ -95,7 +112,7 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
 
     return (
         <div className="bg-gray-50 max-w-6xl mx-auto min-h-screen pt-24 px-6 pb-20">
-            {/* ヘッダー */}
+            {/* ヘッダーエリア (既存) */}
             <div className="mb-6">
                 <Button variant="light" className="mb-4 text-gray-500 pl-0 hover:text-gray-800" onPress={() => router.back()}>
                     ← 戻る
@@ -106,13 +123,44 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
                         <p className="text-gray-500 mt-2">{team.description || "説明はありません"}</p>
                     </div>
                     <div className="flex items-center gap-2">
-                        {/* メンバー招待ボタン */}
                         <AddTeamMember teamId={teamId} teamName={team.name} onSuccess={fetchData} />
                     </div>
                 </div>
             </div>
 
             <Divider className="my-6" />
+
+            {/* ★追加: タスクフロー(グループ)エリア */}
+            <div className="mb-12">
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-bold text-gray-700">タスクフロー</h2>
+                    <CreateTaskGroup teamId={teamId} onGroupCreated={fetchData} />
+                </div>
+
+                {groups.length === 0 ? (
+                    <div className="text-center py-6 text-sm text-gray-400 bg-white rounded-xl border border-dashed border-gray-200">
+                        作成されたフローはありません
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {groups.map((group) => (
+                            <Link href={`/groups/${group.id}`} key={group.id} className="block group">
+                                <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all h-full">
+                                    <h3 className="font-bold text-lg text-gray-800 group-hover:text-blue-600 mb-2">
+                                        {group.title}
+                                    </h3>
+                                    <p className="text-sm text-gray-500 line-clamp-2">
+                                        {group.description || "説明なし"}
+                                    </p>
+                                    <div className="mt-4 text-xs text-blue-500 font-medium group-hover:underline">
+                                        フロー図を開く →
+                                    </div>
+                                </div>
+                            </Link>
+                        ))}
+                    </div>
+                )}
+            </div>
 
             {/* 新規タスク作成・未割り当てエリア */}
             <div className="mb-12">
