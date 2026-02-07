@@ -88,6 +88,20 @@ export const teamMembers = pgTable("team_members", {
   joinedAt: timestamp("joined_at").defaultNow().notNull(),
 });
 
+// ★追加 9. Task Groups Table (タスクをまとめるコンテナ) ---
+export const taskGroups = pgTable("task_groups", {
+  id: varchar("id", { length: 255 }).primaryKey(),
+  teamId: varchar("team_id", { length: 255 })
+    .references(() => teams.id, { onDelete: "cascade" }), // チームに属する場合
+  creatorId: varchar("creator_id", { length: 255 }).notNull(), // 個人利用の場合も考慮
+  
+  title: text("title").notNull(),
+  description: text("description"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // 7. Tasks Table ---
 export const tasks = pgTable("tasks", {
   id: varchar("id", { length: 255 }).primaryKey(),
@@ -95,6 +109,10 @@ export const tasks = pgTable("tasks", {
   teamId: varchar("team_id", { length: 255 })
     .references(() => teams.id, { onDelete: "cascade" }),
   
+  // ★追加: タスクグループへの参照
+  taskGroupId: varchar("task_group_id", { length: 255 })
+    .references(() => taskGroups.id, { onDelete: "set null" }),
+
   creatorId: varchar("creator_id", { length: 255 }).notNull(), // 作成者
   assigneeId: varchar("assignee_id", { length: 255 }), // 担当者
 
@@ -128,8 +146,14 @@ export const taskDependencies = pgTable("task_dependencies", {
 // --- Relations (Drizzle Relation API) ---
 // クエリを書きやすくするためのリレーション定義
 
+// 追加 relation
+export const taskGroupRelations = relations(taskGroups, ({ many }) => ({
+  tasks: many(tasks),
+}));
+
 export const taskRelations = relations(tasks, ({ one, many }) => ({
   team: one(teams, { fields: [tasks.teamId], references: [teams.id] }),
+  taskGroup: one(taskGroups, { fields: [tasks.taskGroupId], references: [taskGroups.id] }), // 追加
   dependencies: many(taskDependencies, { relationName: "successor" }), // 自分が後続のケース
   precedents: many(taskDependencies, { relationName: "predecessor" }), // 自分が先行のケース
 }));
