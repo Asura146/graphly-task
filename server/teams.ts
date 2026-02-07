@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { db } from "@/lib/db";
-import { teams, teamMembers, user as users, tasks } from "@/db/schema"
+// 修正: taskGroups をインポートに追加
+import { teams, teamMembers, user as users, tasks, taskGroups } from "@/db/schema"
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { nanoid } from "nanoid"
@@ -173,4 +174,14 @@ export const teamRoute = new Hono<Env>()
           .innerJoin(users, eq(teamMembers.userId, users.id))
           .where(eq(teamMembers.teamId, teamId));
         return c.json(members);
+      })
+      // ★追加: チーム内のタスクグループ一覧取得
+      .get("/:id/task-groups", async (c) => {
+        const teamId = c.req.param("id");
+        const groups = await db
+            .select()
+            .from(taskGroups)
+            .where(eq(taskGroups.teamId, teamId))
+            .orderBy(desc(taskGroups.createdAt));
+        return c.json(groups);
       });
