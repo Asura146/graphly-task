@@ -21,6 +21,7 @@ import { Input, Textarea } from "@heroui/input";
 import { Button } from "@heroui/button";
 // 追加: Select系のコンポーネント
 import { Select, SelectItem, Avatar } from "@heroui/react";
+import Link from "next/link"; // 追加
 
 type TaskStatus = "todo" | "in_progress" | "done";
 
@@ -41,6 +42,9 @@ interface TaskCardProps {
     // 追加: 担当者変更用のProps
     assigneeId?: string | null; 
     members?: Member[]; // これが渡された時だけ担当者変更UIを表示
+    // ★追加: グループ情報を受け取る
+    groupId?: string | null;
+    groupName?: string | null;
 }
 
 const statusConfig: Record<TaskStatus, { label: string; className: string }> = {
@@ -58,6 +62,9 @@ export default function TaskCard({
     dueDate = "--/--/--",
     assigneeId = null,
     members = [],
+    // ★追加
+    groupId = null,
+    groupName = null,
 }: TaskCardProps) {
     const router = useRouter();
     const { isOpen, onOpen, onOpenChange } = useDisclosure();
@@ -256,9 +263,22 @@ export default function TaskCard({
                             </Dropdown>
                         </div>
 
-                        <div className="flex items-center h-full pl-6 pt-3 pr-8">
+                        <div className="flex flex-col h-full pl-6 pt-3 pr-8">
                             <h2 className="text-lg font-semibold truncate">{title}</h2>
-                            <p className="ml-auto text-sm pt-1 text-gray-500 whitespace-nowrap">{team}</p>
+                            <div className="flex justify-between items-center mt-1">
+                                <p className="text-sm text-gray-500 whitespace-nowrap">{team}</p>
+                                
+                                {/* グループへのリンク表示 */}
+                                {groupId && groupName && (
+                                    <Link 
+                                        href={`/groups/${groupId}`} 
+                                        className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded border border-blue-100 hover:bg-blue-100 transition-colors ml-2 truncate max-w-[100px]"
+                                        onClick={(e) => e.stopPropagation()} // カード反転防止
+                                    >
+                                       📂 {groupName}
+                                    </Link>
+                                )}
+                            </div>
                         </div>
                     </div>
                 }

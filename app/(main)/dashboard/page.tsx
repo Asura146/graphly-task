@@ -19,6 +19,8 @@ interface Task {
     teamId: string | null;
     status?: "todo" | "in_progress" | "done";
     teamName?: string | null; // 追加: サーバーから返ってくるチーム名
+    groupId: string | null;
+    groupTitle: string | null;
 }
 type TeamsResponse = InferResponseType<typeof api.teams.$get, 200>;
 
@@ -138,6 +140,8 @@ export default function DashboardPage() {
                                     status={task.status || "todo"}
                                     dueDate={formatDate(task.dueDate)}
                                     description={task.description || ""}
+                                    groupId={task.groupId}
+                                    groupName={task.groupTitle}
                                 />
                             </div>
                         ))}

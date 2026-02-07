@@ -1,7 +1,7 @@
 // server/routes/tasks.ts
 import { Hono } from "hono";
 import { db } from "@/lib/db";
-import { tasks, teams, teamMembers } from "@/db/schema"; 
+import { tasks, teams, teamMembers, taskGroups } from "@/db/schema"; 
 import { eq, or, and, isNull } from "drizzle-orm";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
@@ -50,9 +50,14 @@ export const taskRoute = new Hono<Env>() // index.tsと同じ型を渡す
         creatorId: tasks.creatorId,
         assigneeId: tasks.assigneeId,
         teamName: teams.name, // チーム名を取得
+        // ★追加: グループ情報を取得
+        groupId: tasks.taskGroupId,
+        groupTitle: taskGroups.title,
       })
       .from(tasks)
       .leftJoin(teams, eq(tasks.teamId, teams.id)) // チームテーブルと結合
+      // ★追加: タスクグループテーブルと結合
+      .leftJoin(taskGroups, eq(tasks.taskGroupId, taskGroups.id))
       .where(
         or(
           eq(tasks.assigneeId, userId),
