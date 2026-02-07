@@ -5,7 +5,7 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { nanoid } from "nanoid";
 import { Env } from "@/server";
-import { eq } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 
 const createGroupSchema = z.object({
     title: z.string().min(1),
@@ -22,6 +22,9 @@ const saveFlowSchema = z.object({
     edges: z.array(z.object({
         source: z.string(),
         target: z.string(),
+        // ★追加: ハンドルIDを受け取る
+        sourceHandle: z.string().nullable().optional(),
+        targetHandle: z.string().nullable().optional(),
     })).optional(),
 });
 
@@ -68,7 +71,14 @@ export const taskGroupRoute = new Hono<Env>()
             // 簡易的にフィルタリング (本来はSQLで解決するのが望ましい)
             edges = allDeps
                 .filter(d => taskIds.includes(d.predecessorId) && taskIds.includes(d.successorId))
-                .map(d => ({ id: d.id, source: d.predecessorId, target: d.successorId }));
+                .map(d => ({ 
+                    id: d.id, 
+                    source: d.predecessorId, 
+                    target: d.successorId,
+                    // ★追加: ハンドル情報を返す
+                    sourceHandle: d.sourceHandle,
+                    targetHandle: d.targetHandle
+                }));
         }
 
         return c.json({ group, tasks: groupTasks, edges });
@@ -81,37 +91,51 @@ export const taskGroupRoute = new Hono<Env>()
         try {
             await db.transaction(async (tx) => {
                 // 1. 座標の更新
+                // ここはループで1つずつ更新せざるを得ないが、ID指定なので高速
                 for (const t of updatedPositions) {
                      await tx.update(tasks)
                         .set({ positionX: t.position.x, positionY: t.position.y })
                         .where(eq(tasks.id, t.id));
                 }
 
-                // 2. 依存関係の更新（既存を削除して作り直すのが簡単）
-                // ※ 本来はグループ内の依存関係だけを消すべきだが、ここでは簡易実装
-                if (edges) {
-                    // グループ内のタスクIDを取得
-                    const currentTasks = await tx.select({ id: tasks.id }).from(tasks).where(eq(tasks.taskGroupId, groupId));
-                    const currentTaskIds = currentTasks.map(t => t.id);
-                    
-                    if (currentTaskIds.length > 0) {
-                        // このグループに関連する依存を削除 (predecessorベース)
-                        // Note: 厳密にはここをもっと精密にする必要があります
-                    }
+                // 2. 依存関係の更新（完全洗い替え戦略）
+                // まず、このグループに所属するタスクのIDリストを取得
+                const groupTasks = await tx
+                    .select({ id: tasks.id })
+                    .from(tasks)
+                    .where(eq(tasks.taskGroupId, groupId));
+                
+                const groupTaskIds = groupTasks.map(t => t.id);
 
-                    // 新しい依存関係を挿入
-                    for (const edge of edges) {
-                        // 重複チェックなどはDBのunique制約に任せるか、ON CONFLICT DO NOTHING
-                        try {
-                            await tx.insert(taskDependencies).values({
-                                id: `dep_${nanoid()}`,
-                                predecessorId: edge.source,
-                                successorId: edge.target,
-                            }).onConflictDoNothing();
-                        } catch (e) {
-                            // ignore duplicate
-                        }
-                    }
+                if (groupTaskIds.length > 0) {
+                    // グループ内のタスク同士を結ぶ依存関係をすべて削除
+                    // 「始点」も「終点」もグループ内のタスクであるものを削除対象とする
+                    await tx.delete(taskDependencies)
+                        .where(and(
+                            inArray(taskDependencies.predecessorId, groupTaskIds),
+                            inArray(taskDependencies.successorId, groupTaskIds)
+                        ));
+                }
+
+                // 3. 新しい依存関係を一括挿入
+                if (edges && edges.length > 0) {
+                    // 万が一フロントエンドから重複データが来ても落ちないように重複排除コードを入れる
+                    const uniqueEdges = Array.from(new Map(edges.map(e => [`${e.source}-${e.target}`, e])).values());
+
+                    // ID生成とオブジェクト整形
+                    const newEdges = uniqueEdges.map(edge => ({
+                        id: `dep_${nanoid()}`,
+                        predecessorId: edge.source,
+                        successorId: edge.target,
+                        // ★追加: ハンドル情報を保存
+                        sourceHandle: edge.sourceHandle ?? null,
+                        targetHandle: edge.targetHandle ?? null,
+                    }));
+
+                    // 一括インサート (insert many)
+                     if (newEdges.length > 0) {
+                        await tx.insert(taskDependencies).values(newEdges);
+                     }
                 }
             });
             return c.json({ success: true });

@@ -138,6 +138,11 @@ export const taskDependencies = pgTable("task_dependencies", {
   successorId: varchar("successor_id", { length: 255 })
     .notNull()
     .references(() => tasks.id, { onDelete: "cascade" }),
+    
+  // ★追加: 接続ハンドルのID (s-right, t-top 等) を保存
+  sourceHandle: varchar("source_handle", { length: 50 }),
+  targetHandle: varchar("target_handle", { length: 50 }),
+
 }, (t) => [
   // 依存関係の重複防止（配列形式）
   unique().on(t.predecessorId, t.successorId),

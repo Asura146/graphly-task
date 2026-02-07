@@ -21,8 +21,8 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { Button } from '@heroui/button';
-import { Input } from '@heroui/react';
 import TaskCard, { Member } from './TaskCard';
+import { CreateGroupTask } from './CreateGroupTask'; // 追加
 
 interface TaskFlowProps {
     groupId: string;
@@ -51,9 +51,22 @@ const CardNode = ({ data }: NodeProps) => {
                 height: originalHeight * scale 
             }}
         >
-            {/* 上、左、右、下の接続ポイント (z-indexを追加してカードの上に表示) */}
-            <Handle type="target" position={Position.Top} className="w-3 h-3 bg-blue-500 z-50" />
-            <Handle type="target" position={Position.Left} className="w-3 h-3 bg-blue-500 z-50" />
+            {/* 上、左の接続ポイント (target: 入力) */}
+            {/* style で top, left をマイナス値にしてカードの外側に少し出す */}
+            <Handle 
+                type="target" 
+                position={Position.Top} 
+                id="t-top"
+                className="w-3 h-3 bg-blue-500 z-50 rounded-full border border-white" 
+                style={{ top: -6 }} 
+            />
+            <Handle 
+                type="target" 
+                position={Position.Left} 
+                id="t-left"
+                className="w-3 h-3 bg-blue-500 z-50 rounded-full border border-white" 
+                style={{ left: -6 }} 
+            />
             
             {/* コンテンツ全体を縮小表示 */}
             <div style={{ 
@@ -67,8 +80,22 @@ const CardNode = ({ data }: NodeProps) => {
                 />
             </div>
 
-            <Handle type="source" position={Position.Right} className="w-3 h-3 bg-blue-500 z-50" />
-            <Handle type="source" position={Position.Bottom} className="w-3 h-3 bg-blue-500 z-50" />
+            {/* 右、下の接続ポイント (source: 出力) */}
+            {/* style で right, bottom をマイナス値にしてカードの外側に少し出す */}
+            <Handle 
+                type="source" 
+                position={Position.Right} 
+                id="s-right"
+                className="w-3 h-3 bg-blue-500 z-50 rounded-full border border-white" 
+                style={{ right: -6 }} 
+            />
+            <Handle 
+                type="source" 
+                position={Position.Bottom} 
+                id="s-bottom"
+                className="w-3 h-3 bg-blue-500 z-50 rounded-full border border-white" 
+                style={{ bottom: -6 }} 
+            />
         </div>
     );
 };
@@ -104,6 +131,9 @@ export default function TaskFlow({ groupId, teamId, initialTasks, initialEdges, 
         id: `e-${e.source}-${e.target}`,
         source: e.source,
         target: e.target,
+        // ★追加: DBから読み込んだハンドルIDをReact Flowに渡す
+        sourceHandle: e.sourceHandle,
+        targetHandle: e.targetHandle,
         animated: true,
         style: { stroke: '#b1b1b7', strokeWidth: 2 },
     }));
@@ -111,9 +141,8 @@ export default function TaskFlow({ groupId, teamId, initialTasks, initialEdges, 
     const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
     const [edges, setEdges, onEdgesChange] = useEdgesState(flowEdges);
     
-    // 新規タスク用のState
-    const [newTaskTitle, setNewTaskTitle] = useState("");
-    const [isAdding, setIsAdding] = useState(false);
+    // ★追加: 保存中の状態管理
+    const [isSaving, setIsSaving] = useState(false);
 
     // エッジ接続時のハンドラ
     const onConnect = useCallback(
@@ -123,14 +152,20 @@ export default function TaskFlow({ groupId, teamId, initialTasks, initialEdges, 
 
     // 保存処理
     const handleSave = async () => {
+        if (isSaving) return; // 連打防止
+        setIsSaving(true);
+
         const body = {
             tasks: nodes.map(n => ({
                 id: n.id,
                 position: n.position
             })),
+            // ★修正: エッジ情報にsourceHandle / targetHandleを含める
             edges: edges.map(e => ({
                 source: e.source,
-                target: e.target
+                target: e.target,
+                sourceHandle: e.sourceHandle,
+                targetHandle: e.targetHandle,
             }))
         };
 
@@ -140,62 +175,47 @@ export default function TaskFlow({ groupId, teamId, initialTasks, initialEdges, 
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body)
             });
-            if(res.ok) {
+            
+            if (res.ok) {
                 alert("フローを保存しました");
             } else {
+                console.error(await res.text());
                 alert("保存に失敗しました");
             }
         } catch(e) {
             console.error(e);
             alert("エラーが発生しました");
-        }
-    };
-
-    // フロー内での簡易タスク追加
-    const handleAddTask = async () => {
-        if(!newTaskTitle) return;
-        setIsAdding(true);
-        try {
-            const res = await fetch("/api/tasks", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    title: newTaskTitle,
-                    teamId: teamId,     
-                    taskGroupId: groupId, 
-                }),
-            });
-
-            if (res.ok) {
-                const newTask = await res.json();
-                // 新しいノードを追加するときもカスタムノードとして追加
-                const newNode: Node = {
-                    id: newTask.id,
-                    type: 'card',
-                    position: { x: 100 + Math.random() * 50, y: 100 + Math.random() * 50 },
-                    data: { 
-                        taskProps: {
-                            id: newTask.id,
-                            title: newTask.title,
-                            description: newTask.description,
-                            status: "todo",
-                            dueDate: "--/--/--",
-                            team: "未割り当て",
-                            members: members
-                        }
-                    },
-                    style: { width: 300 }
-                };
-                setNodes((nds) => nds.concat(newNode));
-                setNewTaskTitle("");
-            }
-        } catch (error) {
-            console.error(error);
-            alert("タスク追加に失敗しました");
         } finally {
-            setIsAdding(false);
+            setIsSaving(false); // 処理終了後に戻す
         }
     };
+
+    // タスク追加後のコールバック (モーダルから呼ばれる)
+    const handleTaskCreated = useCallback((newTask: any) => {
+        // 新しい担当者の名前を特定
+        const assignee = members.find(m => m.id === newTask.assigneeId);
+        const assigneeName = assignee ? assignee.name : null;
+
+        const newNode: Node = {
+            id: newTask.id,
+            type: 'card', 
+            // 画面中央付近にランダム配置
+            position: { x: 100 + Math.random() * 50, y: 100 + Math.random() * 50 },
+            data: { 
+                taskProps: {
+                    id: newTask.id,
+                    title: newTask.title,
+                    description: newTask.description,
+                    status: "todo",
+                    dueDate: newTask.dueDate ? new Date(newTask.dueDate).toLocaleDateString() : "--/--/--",
+                    assigneeId: newTask.assigneeId,
+                    team: assigneeName ? `担当: ${assigneeName}` : "未割り当て",
+                    members: members // 担当者変更用リスト
+                }
+            },
+        };
+        setNodes((nds) => nds.concat(newNode));
+    }, [members, setNodes]);
 
     return (
         <div style={{ width: '100%', height: 'calc(100vh - 200px)', border: '1px solid #e5e7eb', borderRadius: '12px', background: '#f9fafb' }}>
@@ -213,33 +233,27 @@ export default function TaskFlow({ groupId, teamId, initialTasks, initialEdges, 
                 <MiniMap style={{ height: 100 }} zoomable pannable />
                 <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
                 
-                {/* 操作パネル */}
+                {/* 保存ボタン */}
                 <Panel position="top-right" className="flex gap-2 bg-white/80 p-2 rounded-lg shadow-sm backdrop-blur-sm">
-                    <Button size="sm" color="primary" onPress={handleSave}>
+                    <Button 
+                        size="sm" 
+                        color="primary" 
+                        onPress={handleSave}
+                        isLoading={isSaving} // ローディング表示
+                    >
                         配置を保存
                     </Button>
                 </Panel>
 
-                {/* タスク追加パネル */}
-                <Panel position="top-left" className="bg-white p-3 rounded-xl shadow-md border border-gray-100 flex flex-col gap-2 w-64">
-                    <h3 className="text-sm font-bold text-gray-700">タスクを追加</h3>
-                    <div className="flex gap-2">
-                        <Input 
-                            size="sm" 
-                            placeholder="タスク名" 
-                            value={newTaskTitle}
-                            onValueChange={setNewTaskTitle}
-                        />
-                        <Button 
-                            size="sm" 
-                            isIconOnly 
-                            color="secondary" 
-                            onPress={handleAddTask}
-                            isLoading={isAdding}
-                        >
-                            ＋
-                        </Button>
-                    </div>
+                {/* タスク追加パネル (置き換え) */}
+                <Panel position="top-left" className="bg-white p-3 rounded-xl shadow-md border border-gray-100 w-64">
+                    <h3 className="text-sm font-bold text-gray-700 mb-3 ml-1">アクション</h3>
+                    <CreateGroupTask 
+                        teamId={teamId}
+                        groupId={groupId}
+                        members={members}
+                        onTaskCreated={handleTaskCreated}
+                    />
                 </Panel>
             </ReactFlow>
         </div>
