@@ -13,17 +13,31 @@ export default function GroupFlowPage({ params }: { params: Promise<{ groupId: s
     const [groupData, setGroupData] = useState<any>(null);
     const [tasks, setTasks] = useState<any[]>([]);
     const [edges, setEdges] = useState<any[]>([]);
+    // ★追加
+    const [members, setMembers] = useState<any[]>([]);
+    
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
         const fetchGroup = async () => {
             try {
+                // 1. フローとタスク情報の取得
                 const res = await fetch(`/api/task-groups/${groupId}`);
                 if (res.ok) {
                     const data = await res.json();
                     setGroupData(data.group);
+                    
+                    // タスクデータに担当者名が含まれているか確認（API側ですでにJOIN済みの想定）
                     setTasks(data.tasks);
                     setEdges(data.edges);
+
+                    // 2. チームメンバーの取得 (チームIDがある場合のみ)
+                    if (data.group.teamId) {
+                        const memberRes = await fetch(`/api/teams/${data.group.teamId}/members`);
+                        if (memberRes.ok) {
+                            setMembers(await memberRes.json());
+                        }
+                    }
                 } else {
                     alert("フロー情報の取得に失敗しました");
                 }
@@ -41,7 +55,7 @@ export default function GroupFlowPage({ params }: { params: Promise<{ groupId: s
 
     return (
         <div className="bg-white min-h-screen pt-24 px-6 pb-10">
-            <div className="max-w-6xl mx-auto h-full flex flex-col">
+            <div className="max-w-7xl mx-auto h-full flex flex-col">
                 <div className="mb-6 flex justify-between items-end">
                     <div>
                          <Button 
@@ -57,12 +71,13 @@ export default function GroupFlowPage({ params }: { params: Promise<{ groupId: s
                 </div>
 
                 {/* フローエディタ */}
-                <div className="flex-1 w-full">
+                <div className="flex-1 w-full relative">
                     <TaskFlow 
                         groupId={groupId}
                         teamId={groupData.teamId}
                         initialTasks={tasks}
                         initialEdges={edges}
+                        members={members} // メンバーリストを渡す
                     />
                 </div>
             </div>
