@@ -1,14 +1,13 @@
 "use client";
 
-import { useEffect, useState, useCallback, use } from "react";
-import { AddTeamMember } from "@/components/AddTeamMember";
-import { CreateTeamTask } from "./components/CreateTeamTask";
-import TaskCard from "@/components/TaskCard";
-import { CreateTaskGroup } from "@/components/CreateTaskGroup"; // 追加
-import { Divider, User } from "@heroui/react";
+import { useEffect, useState, use, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@heroui/button";
-import Link from "next/link"; // 追加
+import { Avatar } from "@heroui/react";
+import { Divider } from "@heroui/react"; // Dividerを追加
+import Link from "next/link";
+import TaskCard from "@/components/TaskCard"; // TaskCardのインポートを確認
+import { api } from "@/lib/hono";
 
 interface Team {
     id: string;
@@ -35,69 +34,62 @@ interface TeamTask {
     id: string;
     title: string;
     description: string | null;
-    status: "todo" | "in_progress" | "done";
+    // ★修正: APIとの整合性のため string に変更
+    status: string;
     dueDate: string | null;
     assigneeId: string | null;
     assigneeName: string | null;
-    // ★追加
     groupId: string | null;
     groupTitle: string | null;
 }
 
 export default function TeamPage({ params }: { params: Promise<{ teamId: string }> }) {
     const { teamId } = use(params);
-
     const router = useRouter();
+
     const [team, setTeam] = useState<Team | null>(null);
     const [members, setMembers] = useState<Member[]>([]);
     const [tasks, setTasks] = useState<TeamTask[]>([]);
-    const [groups, setGroups] = useState<TaskGroup[]>([]); // 追加
-    const [isLoading, setIsLoading] = useState(true);
+    const [taskGroups, setTaskGroups] = useState<TaskGroup[]>([]);
+    
+    // ★追加: 完了タスクを表示するかどうかのフラグ
+    const [showCompleted, setShowCompleted] = useState(false);
 
+    // データ取得処理
     const fetchData = useCallback(async () => {
         try {
-            const teamRes = await fetch(`/api/teams/${teamId}`);
-            if (teamRes.ok) {
-                setTeam(await teamRes.json());
+            // チーム情報の取得
+            const teamRes = await api.teams[":id"].$get({ param: { id: teamId } });
+            if (!teamRes.ok) {
+                router.push("/dashboard");
+                return;
             }
+            setTeam(await teamRes.json());
 
-            const memberRes = await fetch(`/api/teams/${teamId}/members`);
-            if (memberRes.ok) {
-                setMembers(await memberRes.json());
-            }
+            // メンバーの取得
+            const membersRes = await api.teams[":id"].members.$get({ param: { id: teamId } });
+            if (membersRes.ok) setMembers(await membersRes.json());
 
-            const taskRes = await fetch(`/api/teams/${teamId}/tasks`);
-            if (taskRes.ok) {
-                const taskData: TeamTask[] = await taskRes.json();
-                setTasks(taskData);
-            }
-            
-            // ★追加: グループ一覧取得
-            const groupRes = await fetch(`/api/teams/${teamId}/task-groups`);
-            if (groupRes.ok) {
-                setGroups(await groupRes.json());
-            }
+            // タスクの取得
+            const tasksRes = await api.teams[":id"].tasks.$get({ param: { id: teamId } });
+            if (tasksRes.ok) setTasks(await tasksRes.json());
+
+            // タスクグループの取得
+            const groupsRes = await api.teams[":id"]["task-groups"].$get({ param: { id: teamId } });
+            if(groupsRes.ok) setTaskGroups(await groupsRes.json());
 
         } catch (error) {
             console.error(error);
-        } finally {
-            setIsLoading(false);
         }
-    }, [teamId]);
+    }, [teamId, router]);
 
     useEffect(() => {
         fetchData();
-
-        // ★追加: タスク更新イベントを検知してリロード
-        const handleTaskUpdate = () => {
-            fetchData();
-        };
-
-        window.addEventListener("taskCreated", handleTaskUpdate);
-
-        return () => {
-            window.removeEventListener("taskCreated", handleTaskUpdate);
-        };
+        
+        // イベントリスナー
+        const handleUpdate = () => fetchData();
+        window.addEventListener("taskCreated", handleUpdate);
+        return () => window.removeEventListener("taskCreated", handleUpdate);
     }, [fetchData]);
 
     const formatDate = (dateStr: string | null) => {
@@ -107,82 +99,55 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
         return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
     };
 
-    // 未割り当てタスクの抽出
-    const unassignedTasks = tasks.filter(t => !t.assigneeId);
+    if (!team) return <div className="flex justify-center items-center h-screen">Loading...</div>;
 
-    if (isLoading) return <div className="flex justify-center py-20">読み込み中...</div>;
-    if (!team) return <div className="p-8 text-center">チームが見つかりません</div>;
+    // ★タスクの振り分け（完了以外 / 完了）
+    const activeTasks = tasks.filter(t => t.status !== "DONE");
+    const completedTasks = tasks.filter(t => t.status === "DONE");
+
+    // 未割り当てタスク（アクティブ）
+    const activeUnassignedTasks = activeTasks.filter(t => !t.assigneeId);
+    
+    // 未割り当てタスク（完了）
+    const completedUnassignedTasks = completedTasks.filter(t => !t.assigneeId);
 
     return (
         <div className="bg-gray-50 max-w-6xl mx-auto min-h-screen pt-24 px-6 pb-20">
-            {/* ヘッダーエリア (既存) */}
-            <div className="mb-6">
-                <Button variant="light" className="mb-4 text-gray-500 pl-0 hover:text-gray-800" onPress={() => router.back()}>
-                    ← 戻る
+            {/* ヘッダーエリア */}
+            <div className="mb-8">
+                <Button 
+                    variant="light" 
+                    className="mb-2 text-gray-500 pl-0 hover:text-gray-800" 
+                    onPress={() => router.push("/dashboard")}
+                >
+                    ← ダッシュボードへ戻る
                 </Button>
-                <div className="flex justify-between items-start">
+                <div className="flex justify-between items-end">
                     <div>
                         <h1 className="text-3xl font-bold text-gray-800">{team.name}</h1>
-                        <p className="text-gray-500 mt-2">{team.description || "説明はありません"}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <AddTeamMember teamId={teamId} teamName={team.name} onSuccess={fetchData} />
+                        <p className="text-gray-500 mt-2">{team.description}</p>
                     </div>
                 </div>
             </div>
 
-            <Divider className="my-6" />
+            {/* --- ここから進行中のタスク表示 --- */}
 
-            {/* ★追加: タスクフロー(グループ)エリア */}
+            {/* 未割り当てタスクエリア (Active) */}
             <div className="mb-12">
-                <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-bold text-gray-700">タスクフロー</h2>
-                    <CreateTaskGroup teamId={teamId} onGroupCreated={fetchData} />
-                </div>
-
-                {groups.length === 0 ? (
-                    <div className="text-center py-6 text-sm text-gray-400 bg-white rounded-xl border border-dashed border-gray-200">
-                        作成されたフローはありません
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {groups.map((group) => (
-                            <Link href={`/groups/${group.id}`} key={group.id} className="block group">
-                                <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all h-full">
-                                    <h3 className="font-bold text-lg text-gray-800 group-hover:text-blue-600 mb-2">
-                                        {group.title}
-                                    </h3>
-                                    <p className="text-sm text-gray-500 line-clamp-2">
-                                        {group.description || "説明なし"}
-                                    </p>
-                                    <div className="mt-4 text-xs text-blue-500 font-medium group-hover:underline">
-                                        フロー図を開く →
-                                    </div>
-                                </div>
-                            </Link>
-                        ))}
-                    </div>
-                )}
-            </div>
-
-            {/* 新規タスク作成・未割り当てエリア */}
-            <div className="mb-12">
-                <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-bold text-gray-700">未割り当てタスク</h2>
-                    <CreateTeamTask 
-                        teamId={teamId} 
-                        members={members} 
-                        onTaskCreated={fetchData} 
-                    />
+                <div className="flex items-center gap-2 mb-4">
+                    <h2 className="text-lg font-bold text-gray-700">未割り当てのタスク</h2>
+                    <span className="bg-gray-200 text-gray-700 text-xs px-2 py-0.5 rounded-full font-bold">
+                        {activeUnassignedTasks.length}
+                    </span>
                 </div>
                 
-                {unassignedTasks.length === 0 ? (
-                    <div className="text-center py-6 text-sm text-gray-400 bg-white rounded-xl border border-dashed border-gray-200">
+                {activeUnassignedTasks.length === 0 ? (
+                    <div className="p-6 border-2 border-dashed border-gray-200 rounded-xl text-center text-gray-400 text-sm">
                         未割り当てのタスクはありません
                     </div>
                 ) : (
                     <div className="flex overflow-x-auto pb-4 gap-4">
-                        {unassignedTasks.map((task) => (
+                        {activeUnassignedTasks.map((task) => (
                             <div key={task.id} className="flex-shrink-0">
                                 <TaskCard
                                     id={task.id}
@@ -193,7 +158,6 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
                                     dueDate={formatDate(task.dueDate)}
                                     assigneeId={null}
                                     members={members}
-                                    // ★追加
                                     groupId={task.groupId}
                                     groupName={task.groupTitle}
                                 />
@@ -203,42 +167,36 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
                 )}
             </div>
 
-            {/* メンバー別タスク可視化エリア */}
-            <div className="flex flex-col gap-8">
-                <h2 className="text-xl font-bold text-gray-700">メンバーの進捗</h2>
+            {/* メンバー別タスク可視化エリア (Active) */}
+            <div className="flex flex-col gap-8 mb-12">
+                <h2 className="text-xl font-bold text-gray-800 border-b pb-2">メンバーの進捗状況</h2>
                 
                 {members.map((member) => {
-                    // このメンバーが持っているタスクを抽出
-                    const memberTasks = tasks.filter(t => t.assigneeId === member.id);
+                    const memberTasks = activeTasks.filter(t => t.assigneeId === member.id);
                     
                     return (
                         <div key={member.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                             <div className="flex flex-col md:flex-row gap-6">
                                 {/* 左側: メンバー情報 */}
-                                <div className="w-full md:w-64 flex-shrink-0 flex flex-col gap-2 border-b md:border-b-0 md:border-r border-gray-100 pb-4 md:pb-0 md:pr-4">
-                                    <User
-                                        name={member.name}
-                                        description={member.email}
-                                        avatarProps={{ src: member.image || undefined, size: "lg" }}
-                                        className="justify-start"
+                                <div className="w-full md:w-48 flex-shrink-0 flex flex-col items-center md:items-start border-b md:border-b-0 md:border-r border-gray-100 pb-4 md:pb-0 md:pr-4">
+                                    <Avatar 
+                                        src={member.image || undefined} 
+                                        name={member.name} 
+                                        className="w-16 h-16 text-large mb-3"
                                     />
-                                    <div className="mt-2 flex flex-wrap gap-2">
-                                        <span className={`text-xs px-2 py-1 rounded border ${
-                                            member.role === 'ADMIN' ? 'bg-purple-50 text-purple-700 border-purple-100' : 'bg-gray-50 text-gray-600 border-gray-100'
-                                        }`}>
-                                            {member.role === 'ADMIN' ? '管理者' : 'メンバー'}
-                                        </span>
-                                        <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded border border-blue-100">
-                                            担当タスク: {memberTasks.length}件
-                                        </span>
+                                    <h3 className="font-bold text-gray-800 text-center md:text-left">{member.name}</h3>
+                                    <p className="text-xs text-gray-500 mb-1">{member.role}</p>
+                                    <div className="mt-2 text-xs">
+                                        <span className="font-bold text-blue-600 text-lg">{memberTasks.length}</span> 
+                                        <span className="text-gray-400 ml-1">Active Tasks</span>
                                     </div>
                                 </div>
 
-                                {/* 右側: タスク一覧 (横スクロール) */}
+                                {/* 右側: タスク一覧 */}
                                 <div className="flex-1 overflow-x-auto">
                                     {memberTasks.length === 0 ? (
-                                        <div className="h-full flex items-center justify-center text-gray-400 text-sm py-4">
-                                            割り当てられたタスクはありません
+                                        <div className="h-full flex items-center justify-center text-gray-400 text-sm min-h-[100px]">
+                                            現在担当しているタスクはありません
                                         </div>
                                     ) : (
                                         <div className="flex gap-4 pb-2">
@@ -253,7 +211,6 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
                                                         dueDate={formatDate(task.dueDate)}
                                                         assigneeId={member.id}
                                                         members={members}
-                                                        // ★追加
                                                         groupId={task.groupId}
                                                         groupName={task.groupTitle}
                                                     />
@@ -266,6 +223,94 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
                         </div>
                     );
                 })}
+            </div>
+
+            {/* --- ここから完了タスク表示エリア --- */}
+            
+            <div className="mt-16">
+                <Button 
+                    variant="flat" 
+                    color={showCompleted ? "default" : "primary"}
+                    className="w-full mb-6 font-semibold"
+                    onPress={() => setShowCompleted(!showCompleted)}
+                >
+                    {showCompleted ? "完了したタスクを隠す" : "完了したタスクを表示する"}
+                    <span className="bg-white/20 px-2 py-0.5 rounded text-xs ml-2">
+                        {completedTasks.length}
+                    </span>
+                </Button>
+
+                {showCompleted && (
+                    <div className="animate-appearance-in">
+                        <h2 className="text-xl font-bold text-gray-600 mb-6 border-b pb-2">完了済みタスク</h2>
+
+                        {/* 未割り当て (完了) */}
+                        {completedUnassignedTasks.length > 0 && (
+                             <div className="mb-8 opacity-75">
+                                <h3 className="text-md font-bold text-gray-500 mb-3 ml-2">未割り当て (完了)</h3>
+                                <div className="flex overflow-x-auto pb-4 gap-4">
+                                    {completedUnassignedTasks.map((task) => (
+                                        <div key={task.id} className="flex-shrink-0 transform scale-95 origin-top-left">
+                                            <TaskCard
+                                                id={task.id}
+                                                title={task.title}
+                                                description={task.description}
+                                                team="担当: 未割り当て"
+                                                status={task.status}
+                                                dueDate={formatDate(task.dueDate)}
+                                                assigneeId={null}
+                                                members={members}
+                                                groupId={task.groupId}
+                                                groupName={task.groupTitle}
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* メンバーごと (完了) */}
+                        {members.map((member) => {
+                            const memberCompletedTasks = completedTasks.filter(t => t.assigneeId === member.id);
+                            if (memberCompletedTasks.length === 0) return null;
+
+                            return (
+                                <div key={`done-${member.id}`} className="mb-6 opacity-75">
+                                    <div className="flex items-center gap-2 mb-3 ml-2">
+                                        <Avatar src={member.image || undefined} name={member.name} size="sm" />
+                                        <h3 className="text-md font-bold text-gray-600">{member.name}</h3>
+                                        <span className="text-xs text-gray-400">({memberCompletedTasks.length}件完了)</span>
+                                    </div>
+                                    
+                                    <div className="flex overflow-x-auto pb-4 gap-4 pl-4 border-l-4 border-gray-200">
+                                        {memberCompletedTasks.map((task) => (
+                                            <div key={task.id} className="flex-shrink-0 transform scale-95 origin-top-left">
+                                                <TaskCard
+                                                    id={task.id}
+                                                    title={task.title}
+                                                    description={task.description}
+                                                    team={`担当: ${member.name}`}
+                                                    status={task.status}
+                                                    dueDate={formatDate(task.dueDate)}
+                                                    assigneeId={member.id}
+                                                    members={members}
+                                                    groupId={task.groupId}
+                                                    groupName={task.groupTitle}
+                                                />
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                        
+                        {completedTasks.length === 0 && (
+                            <div className="text-center text-gray-400 py-4">
+                                完了したタスクはありません
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
         </div>
     );
