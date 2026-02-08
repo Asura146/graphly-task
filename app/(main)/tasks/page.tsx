@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import TaskCard from "@/components/TaskCard";
-import { Divider, Button } from "@heroui/react";
+import { Divider, Button, Spinner } from "@heroui/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -64,7 +64,7 @@ export default function TasksPage() {
 
     return (
         <div className="bg-gray-100 w-full min-h-screen">
-            <div className="pt-24 px-6 max-w-5xl mx-auto pb-20">
+            <div className="pt-24 px-6 max-w-6xl mx-auto pb-20">
                 <div className="flex mb-6 items-end justify-between">
                     <div>
                         <Button 
@@ -94,7 +94,7 @@ export default function TasksPage() {
 
                 {isLoading ? (
                     <div className="flex justify-center items-center py-20">
-                        <div className="text-gray-500">読み込み中...</div>
+                        <Spinner size="lg" />
                     </div>
                 ) : tasks.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-20 text-gray-500">
@@ -111,7 +111,7 @@ export default function TasksPage() {
                         </div>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2  lg:grid-cols-4 gap-4">
                         {tasks.map((task) => (
                             <div key={task.id} className="flex justify-center">
                                 <TaskCard
