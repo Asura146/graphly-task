@@ -19,13 +19,12 @@ import {
 } from "@heroui/modal";
 import { Input, Textarea } from "@heroui/input";
 import { Button } from "@heroui/button";
-// 追加: Select系のコンポーネント
 import { Select, SelectItem, Avatar } from "@heroui/react";
-import Link from "next/link"; // 追加
+import Link from "next/link";
+import confetti from "canvas-confetti";
 
 type TaskStatus = "todo" | "in_progress" | "done";
 
-// 追加: メンバー情報の型定義
 export interface Member {
     id: string;
     name: string;
@@ -33,17 +32,14 @@ export interface Member {
 }
 
 interface TaskCardProps {
-    id?: string; // 編集・削除のためにIDが必要
+    id?: string;
     title?: string;
-    description?: string | null; // 編集用に説明を受け取る
+    description?: string | null;
     team?: string;
-    // ★修正: APIから "TODO" (大文字) などが来るため、stringを受け入れられるようにする
     status?: string; 
     dueDate?: string;
-    // 追加: 担当者変更用のProps
     assigneeId?: string | null; 
-    members?: Member[]; // これが渡された時だけ担当者変更UIを表示
-    // ★追加: グループ情報を受け取る
+    members?: Member[];
     groupId?: string | null;
     groupName?: string | null;
 }
@@ -63,31 +59,34 @@ export default function TaskCard({
     dueDate = "--/--/--",
     assigneeId = null,
     members = [],
-    // ★追加
     groupId = null,
     groupName = null,
 }: TaskCardProps) {
     const router = useRouter();
     const { isOpen, onOpen, onOpenChange } = useDisclosure();
+    
     const { 
         isOpen: isDeleteOpen, 
         onOpen: onDeleteOpen, 
         onOpenChange: onDeleteOpenChange 
     } = useDisclosure();
+
+    const { 
+        isOpen: isCompleteOpen, 
+        onOpen: onCompleteOpen, 
+        onOpenChange: onCompleteOpenChange 
+    } = useDisclosure();
+
     const [isLoading, setIsLoading] = useState(false);
 
-    // 編集フォームの状態
     const [editTitle, setEditTitle] = useState(title);
     const [editDescription, setEditDescription] = useState(description || "");
     const [editDueDate, setEditDueDate] = useState("");
-    // 追加: 担当者編集用state
     const [editAssigneeId, setEditAssigneeId] = useState<string>(assigneeId || "");
 
-    // ステータスの正規化処理
-    // APIから "IN_PROGRESS" (大文字) が来る場合や、"doing" などの表記揺れを吸収する
     const normalizedStatus: TaskStatus = (() => {
         if (!status) return "todo";
-        const s = status.toString().toLowerCase(); // 小文字化
+        const s = status.toString().toLowerCase();
         if (s === "in_progress" || s === "doing") return "in_progress";
         if (s === "done") return "done";
         return "todo";
@@ -95,7 +94,6 @@ export default function TaskCard({
 
     const currentStatus = statusConfig[normalizedStatus] || statusConfig.todo;
 
-    // 残り日数の計算（既存ロジック）
     const getRemainingDays = (dateStr: string) => {
         if (dateStr === "--/--/--" || !dateStr) return null;
         const targetDate = new Date(dateStr);
@@ -110,7 +108,6 @@ export default function TaskCard({
     const remainingDays = getRemainingDays(dueDate);
     const isUrgent = remainingDays !== null && remainingDays <= 3 && remainingDays >= 0;
 
-    // 期限に応じたヘッダー色の決定
     const getHeaderColor = () => {
         if (remainingDays === null) return "bg-gray-300";
         if (remainingDays <= 3) return "bg-red-500";
@@ -120,21 +117,18 @@ export default function TaskCard({
 
     const headerColor = getHeaderColor();
 
-    // 削除処理（モーダル用）
     const handleDelete = async (onClose: () => void) => {
         if (!id) return;
-
         setIsLoading(true);
         try {
             const res = await fetch(`/api/tasks/${id}`, { method: "DELETE" });
             if (!res.ok) throw new Error("Delete failed");
             
-            // ダッシュボード更新通知
             if (typeof window !== "undefined") {
                 window.dispatchEvent(new Event("taskCreated"));
             }
             router.refresh();
-            onClose(); // モーダルを閉じる
+            onClose();
         } catch (error) {
             console.error(error);
             alert("削除に失敗しました");
@@ -143,11 +137,10 @@ export default function TaskCard({
         }
     };
 
-    // 編集モーダルを開く準備
     const handleOpenEdit = () => {
         setEditTitle(title);
-        setEditDescription(description || ""); // 親から渡された description をここで入れ直す
-        setEditAssigneeId(assigneeId || ""); // 現在の担当者をセット
+        setEditDescription(description || "");
+        setEditAssigneeId(assigneeId || "");
         
         if (dueDate && dueDate !== "--/--/--") {
             const formatted = dueDate.includes("/") ? dueDate.split("/").join("-") : dueDate;
@@ -156,18 +149,7 @@ export default function TaskCard({
         onOpen();
     };
 
-    // 更新処理
     const handleUpdate = async (onClose: () => void) => {
-        console.log("1. handleUpdateが呼ばれました");
-        console.log("2. 現在のID:", id); // ここが undefined なら親コンポーネントを確認
-        
-        if (!id) {
-            console.error("3. IDがないため中断しました");
-            return;
-        }
-    
-        console.log("4. APIリクエストを開始します...");
-        setIsLoading(true);
         if (!id) return;
         setIsLoading(true);
         try {
@@ -178,7 +160,7 @@ export default function TaskCard({
                     title: editTitle,
                     description: editDescription,
                     dueDate: editDueDate || undefined,
-                    assigneeId: editAssigneeId || null, // 担当者情報を含める
+                    assigneeId: editAssigneeId || null,
                 }),
             });
 
@@ -197,23 +179,13 @@ export default function TaskCard({
         }
     };
 
-    // クイックステータス変更
-    const handleStatusChange = async (newStatus: TaskStatus) => {
-        if (!id) return;
-        
-        // サーバー用ステータスマップ
-        const serverStatusMap: Record<string, string> = {
-            todo: "TODO",
-            in_progress: "IN_PROGRESS", // キーを 'in_progress' に統一
-            done: "DONE",
-        };
-
+    const updateTaskStatus = async (serverStatusKey: string) => {
         try {
             const res = await fetch(`/api/tasks/${id}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    status: serverStatusMap[newStatus],
+                    status: serverStatusKey,
                 }),
             });
 
@@ -229,6 +201,35 @@ export default function TaskCard({
         }
     };
 
+    const handleStatusChangeData = async (newStatus: TaskStatus) => {
+        if (!id) return;
+
+        if (newStatus === "done") {
+            onCompleteOpen();
+            return; 
+        }
+
+        const serverStatusMap: Record<string, string> = {
+            todo: "TODO",
+            in_progress: "IN_PROGRESS",
+            done: "DONE",
+        };
+        await updateTaskStatus(serverStatusMap[newStatus]);
+    };
+
+    const handleConfirmComplete = async (onClose: () => void) => {
+        confetti({
+            particleCount: 150,
+            spread: 70,
+            origin: { y: 0.6 },
+            zIndex: 9999,
+        });
+
+        await updateTaskStatus("DONE");
+        
+        onClose();
+    };
+
     return (
         <>
             <FripCard
@@ -237,15 +238,13 @@ export default function TaskCard({
                 }
                 frontTopContent={
                     <div className="h-full relative">
-                         {/* 右上のメニューボタン */}
                          <div className="absolute top-0 right-2 z-50">
                             <Dropdown>
                                 <DropdownTrigger>
                                     <button 
                                         className="p-1 rounded-full hover:bg-gray-100 text-gray-400 transition-colors"
-                                        onClick={(e) => e.stopPropagation()} // カードの反転を防止
+                                        onClick={(e) => e.stopPropagation()}
                                     >
-                                        {/* 三点リーダーアイコン */}
                                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                             <circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>
                                         </svg>
@@ -255,7 +254,7 @@ export default function TaskCard({
                                     aria-label="Task Actions" 
                                     onAction={(key) => {
                                         if (key === "edit") handleOpenEdit();
-                                        if (key === "delete") onDeleteOpen(); // 削除モーダルを開く
+                                        if (key === "delete") onDeleteOpen();
                                     }}
                                 >
                                     <DropdownItem key="edit">編集</DropdownItem>
@@ -269,12 +268,11 @@ export default function TaskCard({
                             <div className="flex justify-between items-center mt-1">
                                 <p className="text-sm text-gray-500 whitespace-nowrap">{team}</p>
                                 
-                                {/* グループへのリンク表示 */}
                                 {groupId && groupName && (
                                     <Link 
                                         href={`/groups/${groupId}`} 
                                         className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded border border-blue-100 hover:bg-blue-100 transition-colors ml-2 truncate max-w-[100px]"
-                                        onClick={(e) => e.stopPropagation()} // カード反転防止
+                                        onClick={(e) => e.stopPropagation()}
                                     >
                                        📂 {groupName}
                                     </Link>
@@ -286,7 +284,6 @@ export default function TaskCard({
                 frontBottomContent={
                     <div className="w-full px-6 flex justify-between items-end">
                         <div className="flex flex-col gap-2 items-start" onClick={(e) => e.stopPropagation()}>
-                            {/* ステータス表示 - クリックで変更可能なドロップダウンにする */}
                             <Dropdown>
                                 <DropdownTrigger>
                                     <button 
@@ -297,7 +294,7 @@ export default function TaskCard({
                                 </DropdownTrigger>
                                 <DropdownMenu 
                                     aria-label="Status Actions" 
-                                    onAction={(key) => handleStatusChange(key as TaskStatus)}
+                                    onAction={(key) => handleStatusChangeData(key as TaskStatus)}
                                 >
                                     <DropdownItem key="todo">未着手</DropdownItem>
                                     <DropdownItem key="in_progress">進行中</DropdownItem>
@@ -305,7 +302,6 @@ export default function TaskCard({
                                 </DropdownMenu>
                             </Dropdown>
 
-                            {/* 期限表示 */}
                             <div className="flex items-center text-gray-700 text-sm font-semibold">
                                 <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
@@ -314,7 +310,6 @@ export default function TaskCard({
                             </div>
                         </div>
 
-                        {/* 残り日数 */}
                         <div className="text-right pb-0.5 pr-10">
                             {remainingDays !== null ? (
                                 <>
@@ -339,7 +334,6 @@ export default function TaskCard({
                 height="200px"
             />
 
-            {/* 編集用モーダル */}
             <Modal isOpen={isOpen} onOpenChange={onOpenChange} placement="center">
                 <ModalContent>
                     {(onClose) => (
@@ -353,8 +347,6 @@ export default function TaskCard({
                                         onValueChange={setEditTitle}
                                         isRequired
                                     />
-                                    
-                                    {/* メンバー一覧が渡されている場合のみ担当者選択を表示 */}
                                     {members && members.length > 0 && (
                                         <Select 
                                             label="担当者"
@@ -372,7 +364,6 @@ export default function TaskCard({
                                             ))}
                                         </Select>
                                     )}
-
                                     <Textarea
                                         label="詳細"
                                         value={editDescription}
@@ -403,8 +394,35 @@ export default function TaskCard({
                     )}
                 </ModalContent>
             </Modal>
+            
+            {/* タスク完了確認モーダル */}
+            <Modal isOpen={isCompleteOpen} onOpenChange={onCompleteOpenChange} placement="center">
+                <ModalContent>
+                    {(onClose) => (
+                        <>
+                            {/* <ModalHeader className="flex flex-col gap-1 text-green-600">タスクを完了とする？</ModalHeader> */}
+                            <ModalBody>
+                                <div className="text-center py-4">
+                                    <p className="text-lg font-bold mb-2">素晴らしい！</p>
+                                    <p className="text-gray-600">このタスクを完了にしますか？</p>
+                                </div>
+                            </ModalBody>
+                            <ModalFooter>
+                                <Button variant="light" onPress={onClose}>
+                                    まだ
+                                </Button>
+                                <Button 
+                                    className="bg-green-500 text-white font-bold" 
+                                    onPress={() => handleConfirmComplete(onClose)}
+                                >
+                                    完了とする！
+                                </Button>
+                            </ModalFooter>
+                        </>
+                    )}
+                </ModalContent>
+            </Modal>
 
-            {/* 削除確認用モーダル */}
             <Modal isOpen={isDeleteOpen} onOpenChange={onDeleteOpenChange} placement="center">
                 <ModalContent>
                     {(onClose) => (

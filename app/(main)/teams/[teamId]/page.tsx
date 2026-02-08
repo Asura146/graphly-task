@@ -8,6 +8,8 @@ import { Divider } from "@heroui/react"; // Dividerを追加
 import Link from "next/link";
 import TaskCard from "@/components/TaskCard"; // TaskCardのインポートを確認
 import { api } from "@/lib/hono";
+// ★追加: タスクグループ作成コンポーネントをインポート
+import { CreateTaskGroup } from "@/components/CreateTaskGroup";
 
 interface Team {
     id: string;
@@ -127,8 +129,40 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
                         <h1 className="text-3xl font-bold text-gray-800">{team.name}</h1>
                         <p className="text-gray-500 mt-2">{team.description}</p>
                     </div>
+                    {/* ★追加: グループ作成ボタンを表示 */}
+                    <div className="mb-1">
+                         <CreateTaskGroup teamId={teamId} onGroupCreated={fetchData} />
+                    </div>
                 </div>
             </div>
+
+            {/* ★追加: チームのタスクグループ（フロー）一覧表示エリア */}
+            <div className="mb-10">
+                <h2 className="text-lg font-bold text-gray-700 mb-4">チームフロー</h2>
+                
+                {taskGroups.length === 0 ? (
+                    <div className="p-4 border border-dashed border-gray-300 rounded-lg text-gray-500 text-sm bg-white/50">
+                        チームのフローはまだ作成されていません
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {taskGroups.map((group) => (
+                            <Link href={`/groups/${group.id}`} key={group.id} className="block group">
+                                <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-all">
+                                    <h3 className="font-bold text-gray-800 group-hover:text-blue-600 mb-1">
+                                        {group.title}
+                                    </h3>
+                                    <p className="text-xs text-gray-500 line-clamp-1">
+                                        {group.description || "説明なし"}
+                                    </p>
+                                </div>
+                            </Link>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            <Divider className="my-8" />
 
             {/* --- ここから進行中のタスク表示 --- */}
 
