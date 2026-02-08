@@ -69,7 +69,7 @@ export default function CreateMyTask() {
 
   return (
     <>
-      <Button onPress={onOpen} color="primary" className="font-medium shadow-md">
+      <Button onPress={onOpen} color="primary" variant="flat" className="font-medium shadow-md">
         ＋ タスクを追加
       </Button>
 
