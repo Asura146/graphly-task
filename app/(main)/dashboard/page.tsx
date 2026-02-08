@@ -156,29 +156,7 @@ export default function DashboardPage() {
                     </div>
                 </div>
 
-                {/* 個人フロー一覧 */}
-                <h1 className="text-lg font-medium mb-2">個人フロー</h1>
-                <Divider className="mb-6" />
-                <div className="mb-10">
-                    {personalGroups.length === 0 ? (
-                        <p className="text-gray-500 text-sm">作成された個人的なフローはありません</p>
-                    ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {personalGroups.map((group) => (
-                                <Link href={`/groups/${group.id}`} key={group.id} className="block group">
-                                    <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-all">
-                                        <h3 className="font-bold text-gray-800 group-hover:text-blue-600 mb-1">
-                                            {group.title}
-                                        </h3>
-                                        <p className="text-xs text-gray-500 line-clamp-1">
-                                            {group.description || "説明なし"}
-                                        </p>
-                                    </div>
-                                </Link>
-                            ))}
-                        </div>
-                    )}
-                </div>
+                
 
                 <div className="flex">
                     <h1 className="text-lg font-semibold mb-2">あなたのタスク</h1>
@@ -196,7 +174,7 @@ export default function DashboardPage() {
                     </div>
                 </div>
                 
-                <Divider className="" />
+                <Divider/>
 
                 {isLoading ? (
                     <div className="flex justify-center items-center py-20">
@@ -236,7 +214,7 @@ export default function DashboardPage() {
                     {teams.map((team) => (
                         <Link key={team.id} href={`/teams/${team.id}`} className="block">
                             <Card className="hover:shadow-lg transition-shadow cursor-pointer max-w-md" shadow="sm">
-                                <CardBody>
+                                <CardBody className="p-4">
                                     <div className="flex items-center">
                                         <h3 className="font-bold text-lg">{team.name}</h3>
                                         <span className="text-xs bg-gray-100 text-gray-600 px-3 py-1 rounded-full border border-gray-200 ml-auto">
@@ -252,6 +230,32 @@ export default function DashboardPage() {
                         </Link>
                     ))}
                     {teams.length === 0 && <p className="text-gray-500">所属しているチームはありません</p>}
+                </div>
+                {/* 個人フロー一覧 */}
+                <h1 className="text-lg font-medium mb-2 pt-6">個人フロー</h1>
+                <Divider className="mb-6" />
+                <div className="mb-10">
+                    {personalGroups.length === 0 ? (
+                        <p className="text-gray-500 text-sm">作成された個人的なフローはありません</p>
+                    ) : (
+                        <div className="grid gap-4 flex-cols-1 md:grid-cols-2 lg:grid-cols-3">
+                            {personalGroups.map((group) => (
+                                <Link href={`/groups/${group.id}`} key={group.id} className="block group">
+                                    <Card className="hover:shadow-lg transition-shadow cursor-pointer max-w-md" shadow="sm">
+                                        <CardBody className="p-4">
+                                        <h3 className="font-bold text-lg">
+                                            {group.title}
+                                        </h3>
+                                        <Divider className="my-2" />
+                                        <p className="text-sm text-gray-500">
+                                            {group.description || "説明なし"}
+                                        </p>
+                                        </CardBody>
+                                    </Card>
+                                </Link>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
