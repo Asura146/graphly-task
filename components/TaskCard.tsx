@@ -274,7 +274,7 @@ export default function TaskCard({
                                         className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded border border-blue-100 hover:bg-blue-100 transition-colors ml-2 truncate max-w-[100px]"
                                         onClick={(e) => e.stopPropagation()}
                                     >
-                                       📂 {groupName}
+                                        <p className="px-1 truncate">{groupName}</p>
                                     </Link>
                                 )}
                             </div>
