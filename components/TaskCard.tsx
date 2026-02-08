@@ -106,7 +106,7 @@ export default function TaskCard({
     };
 
     const remainingDays = getRemainingDays(dueDate);
-    const isUrgent = remainingDays !== null && remainingDays <= 3 && remainingDays >= 0;
+    const isUrgent = remainingDays !== null && remainingDays <= 3;
 
     const getHeaderColor = () => {
         if (remainingDays === null) return "bg-gray-300";
