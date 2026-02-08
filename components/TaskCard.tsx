@@ -37,7 +37,8 @@ interface TaskCardProps {
     title?: string;
     description?: string | null; // 編集用に説明を受け取る
     team?: string;
-    status?: TaskStatus;
+    // ★修正: APIから "TODO" (大文字) などが来るため、stringを受け入れられるようにする
+    status?: string; 
     dueDate?: string;
     // 追加: 担当者変更用のProps
     assigneeId?: string | null; 

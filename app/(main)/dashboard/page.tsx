@@ -9,6 +9,7 @@ import { CreateTeam } from "@/components/CreateTeam";
 import { api } from "@/lib/hono";
 import { InferResponseType } from "hono/client";
 import Link from "next/link";
+import { Button } from "@heroui/button"; // Buttonをインポート
 
 // タスクの型定義
 interface Task {
@@ -17,7 +18,7 @@ interface Task {
     description: string | null;
     dueDate: string | null;
     teamId: string | null;
-    status?: "todo" | "in_progress" | "done";
+    status?: string;
     teamName?: string | null;
     groupId: string | null;
     groupTitle: string | null;
@@ -45,8 +46,11 @@ export default function DashboardPage() {
             if (res.ok) {
                 const data: Task[] = await res.json();
 
+                // ★修正: 完了(DONE)以外のタスクのみをフィルタリング
+                const activeTasks = data.filter(t => t.status !== "DONE");
+
                 // 期限が近い順にソート (nullは後ろへ)
-                const sortedData = data.sort((a, b) => {
+                const sortedData = activeTasks.sort((a, b) => {
                     if (!a.dueDate) return 1;
                     if (!b.dueDate) return -1;
                     return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
@@ -136,6 +140,17 @@ export default function DashboardPage() {
                 <div className="flex">
                     <h1 className="text-2xl font-bold mt-4 mb-6">ダッシュボード</h1>
                     <div className="ml-auto mt-4 mb-6 flex gap-2"> {/* flex gap-2に変更 */}
+                        {/* ★追加: 完了済みタスク一覧へのリンク */}
+                        <Button 
+                            as={Link} 
+                            href="/tasks" 
+                            size="sm" 
+                            variant="flat" 
+                            className="mr-2"
+                        >
+                            完了済み一覧
+                        </Button>
+
                         <div className="scale-90 origin-right">
                             <CreateTaskGroup onGroupCreated={fetchPersonalGroups} /> {/* チームIDなしで呼び出し */}
                         </div>
