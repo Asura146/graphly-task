@@ -1,7 +1,7 @@
 "use client";
 
 // 修正: ComponentProps を追加でインポート
-import { useCallback, useState, useMemo, ComponentProps } from 'react';
+import { useCallback, useState, useMemo, ComponentProps, useEffect } from 'react';
 import {
   ReactFlow,
   MiniMap,
@@ -122,6 +122,8 @@ export default function TaskFlow({ groupId, teamId, initialTasks, initialEdges, 
                 assigneeId: t.assigneeId,
                 team: t.assigneeName ? `担当: ${t.assigneeName}` : "未割り当て",
                 members: members, // 担当者変更用リスト
+                groupId: groupId,
+                groupName: t.groupTitle
             }
         },
         // ★修正: styleでの固定幅指定を削除 (CardNode側で制御するため)
@@ -216,6 +218,43 @@ export default function TaskFlow({ groupId, teamId, initialTasks, initialEdges, 
         };
         setNodes((nds) => nds.concat(newNode));
     }, [members, setNodes]);
+
+    // ★追加: データの更新を検知してノードに反映させる (位置は維持)
+    useEffect(() => {
+        setNodes((currentNodes) => 
+            initialTasks.map((t) => {
+                // 現在表示中のノードがあればその位置を維持し、なければDBの位置を使う
+                const existingNode = currentNodes.find((n) => n.id === t.id);
+                const position = existingNode ? existingNode.position : { x: t.positionX, y: t.positionY };
+
+                // 担当者名の解決
+                const assignee = members.find(m => m.id === t.assigneeId);
+                const assigneeName = assignee ? assignee.name : t.assigneeName;
+
+                return {
+                    id: t.id,
+                    type: 'card',
+                    position: position,
+                    data: { 
+                        taskProps: {
+                            id: t.id,
+                            title: t.title,
+                            description: t.description,
+                            status: t.status,
+                            dueDate: t.dueDate ? new Date(t.dueDate).toLocaleDateString() : "--/--/--",
+                            assigneeId: t.assigneeId,
+                            team: assigneeName ? `担当: ${assigneeName}` : "未割り当て",
+                            members: members,
+                            groupId: groupId,
+                            groupName: t.groupTitle
+                        }
+                    },
+                    // ドラッグ中の状態などがリセットされないよう注意が必要ですが、
+                    // 基本的な情報の更新にはこれで対応できます
+                };
+            })
+        );
+    }, [initialTasks, members, setNodes, groupId]);
 
     return (
         <div style={{ width: '100%', height: 'calc(100vh - 200px)', border: '1px solid #e5e7eb', borderRadius: '12px', background: '#f9fafb' }}>
