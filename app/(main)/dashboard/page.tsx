@@ -4,12 +4,11 @@ import { useEffect, useState, useCallback, use } from "react";
 import TaskCard from "@/components/TaskCard";
 import CreateMyTask from "@/components/CreateMyTask";
 import { CreateTaskGroup } from "@/components/CreateTaskGroup"; // ★追加
-import { Divider } from "@heroui/react";
+import { Divider, Button, Spinner } from "@heroui/react";
 import { CreateTeam } from "@/components/CreateTeam";
 import { api } from "@/lib/hono";
 import { InferResponseType } from "hono/client";
 import Link from "next/link";
-import { Button } from "@heroui/button"; // Buttonをインポート
 
 // タスクの型定義
 interface Task {
@@ -181,12 +180,27 @@ export default function DashboardPage() {
                     )}
                 </div>
 
-                <h1 className="text-lg font-medium mb-2">あなたのタスク一覧</h1>
-                <Divider className="mb-6" />
+                <div className="flex">
+                    <h1 className="text-lg font-semibold mb-2">あなたのタスク</h1>
+                    <div className="ml-auto mb-2">
+                    <Button 
+                            as={Link} 
+                            href="/tasks" 
+                            size="sm" 
+                            variant="flat" 
+                            className="mr-2"
+                        >
+                            <p className="mx-1">タスク一覧→</p>
+                        </Button>
+
+                    </div>
+                </div>
+                
+                <Divider className="" />
 
                 {isLoading ? (
                     <div className="flex justify-center items-center py-20">
-                        <div className="text-gray-500">読み込み中...</div>
+                        <Spinner size="lg" />
                     </div>
                 ) : tasks.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-20 text-gray-500">
@@ -194,9 +208,9 @@ export default function DashboardPage() {
                         <p className="text-sm mt-2">ヘッダーの「＋タスクを追加」から作成できます。</p>
                     </div>
                 ) : (
-                    <div className="flex overflow-x-auto grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 place-items-center">
+                    <div className="flex overflow-x-auto grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 place-items-center">
                         {tasks.map((task) => (
-                            <div key={task.id} className="flex-shrink-0">
+                            <div key={task.id} className="flex-shrink-0 my-4">
                                 <TaskCard
                                     id={task.id}
                                     title={task.title}
