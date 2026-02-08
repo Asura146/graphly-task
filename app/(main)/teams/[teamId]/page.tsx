@@ -132,11 +132,13 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
                         </div>
                         {/* ★追加: グループ作成ボタンを表示 */}
                         <div className="mb-1 flex">
-                            <CreateTeamTask 
-                                teamId={teamId} 
-                                members={members} 
-                                onTaskCreated={fetchData} 
-                            />
+                            <div className="mr-4">
+                                <CreateTeamTask 
+                                    teamId={teamId} 
+                                    members={members} 
+                                    onTaskCreated={fetchData}
+                                />
+                            </div>
                             <CreateTaskGroup teamId={teamId} onGroupCreated={fetchData} />
                         </div>
                     </div>
