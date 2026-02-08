@@ -139,20 +139,10 @@ export default function DashboardPage() {
                 <div className="flex">
                     <h1 className="text-2xl font-bold mt-4 mb-6">ダッシュボード</h1>
                     <div className="ml-auto mt-4 mb-6 flex gap-2">
-                        <Button 
-                            as={Link} 
-                            href="/tasks/completed" 
-                            size="sm" 
-                            variant="flat" 
-                            className="mr-2"
-                        >
-                            完了済み一覧
-                        </Button>
-
-                        <div className="scale-90 origin-right">
-                            <CreateTaskGroup onGroupCreated={fetchPersonalGroups} /> {/* チームIDなしで呼び出し */}
+                        <div className="mr-2">
+                            <CreateMyTask />
                         </div>
-                        <CreateMyTask />
+                        
                     </div>
                 </div>
 
@@ -203,9 +193,9 @@ export default function DashboardPage() {
                         ))}
                     </div>
                 )}
-                <div className="flex">
-                    <h1 className="text-lg font-medium mb-2 pt-5">所属チーム一覧</h1>
-                    <div className="ml-auto mt-4 mb-2">
+                <div className="flex pt-12 items-center mb-2">
+                    <h1 className="text-lg font-medium">所属チーム一覧</h1>
+                    <div className="ml-auto">
                         <CreateTeam />
                     </div>
                 </div>
@@ -232,7 +222,13 @@ export default function DashboardPage() {
                     {teams.length === 0 && <p className="text-gray-500">所属しているチームはありません</p>}
                 </div>
                 {/* 個人フロー一覧 */}
-                <h1 className="text-lg font-medium mb-2 pt-6">個人フロー</h1>
+                <div className="flex pt-12 items-center mb-2">
+                    <h1 className="text-lg font-medium">個人フロー</h1>
+                    <div className="ml-auto">
+                        <CreateTaskGroup onGroupCreated={fetchPersonalGroups} /> {/* チームIDなしで呼び出し */}
+                    </div>
+                </div>
+                
                 <Divider className="mb-6" />
                 <div className="mb-10">
                     {personalGroups.length === 0 ? (
