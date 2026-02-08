@@ -1,6 +1,5 @@
 "use client";
 
-// 修正: ComponentProps を追加でインポート
 import { useCallback, useState, useMemo, ComponentProps, useEffect } from 'react';
 import {
   ReactFlow,
@@ -20,9 +19,9 @@ import {
   NodeProps,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Button } from '@heroui/button';
+import { Button, addToast } from '@heroui/react';
 import TaskCard, { Member } from './TaskCard';
-import { CreateGroupTask } from './CreateGroupTask'; // 追加
+import { CreateGroupTask } from './CreateGroupTask';
 
 interface TaskFlowProps {
     groupId: string;
@@ -179,14 +178,20 @@ export default function TaskFlow({ groupId, teamId, initialTasks, initialEdges, 
             });
             
             if (res.ok) {
-                alert("フローを保存しました");
+                addToast({ title: "配置を保存しました" });
             } else {
                 console.error(await res.text());
-                alert("保存に失敗しました");
+                addToast({ 
+                    title: "保存に失敗しました。",
+                    color: "danger"
+                });
             }
         } catch(e) {
             console.error(e);
-            alert("エラーが発生しました");
+            addToast({ 
+                title: "エラーが発生しました",
+                color: "danger"
+            });
         } finally {
             setIsSaving(false); // 処理終了後に戻す
         }
