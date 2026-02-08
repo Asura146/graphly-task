@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect, useState, useCallback, use } from "react"; // useCallbackを追加
+import { useEffect, useState, useCallback, use } from "react";
 import TaskCard from "@/components/TaskCard";
 import CreateMyTask from "@/components/CreateMyTask";
+import { CreateTaskGroup } from "@/components/CreateTaskGroup"; // ★追加
 import { Divider } from "@heroui/react";
 import { CreateTeam } from "@/components/CreateTeam";
 import { api } from "@/lib/hono";
 import { InferResponseType } from "hono/client";
-import { set } from "zod";
-import Link from "next/link"; // Linkをインポート
+import Link from "next/link";
 
 // タスクの型定義
 interface Task {
@@ -18,16 +18,25 @@ interface Task {
     dueDate: string | null;
     teamId: string | null;
     status?: "todo" | "in_progress" | "done";
-    teamName?: string | null; // 追加: サーバーから返ってくるチーム名
+    teamName?: string | null;
     groupId: string | null;
     groupTitle: string | null;
 }
+
+// TaskGroup型を追加
+interface TaskGroup {
+    id: string;
+    title: string;
+    description: string | null;
+}
+
 type TeamsResponse = InferResponseType<typeof api.teams.$get, 200>;
 
 export default function DashboardPage() {
     const [tasks, setTasks] = useState<Task[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [teams, setTeams] = useState<TeamsResponse>([]);
+    const [personalGroups, setPersonalGroups] = useState<TaskGroup[]>([]); // ★追加
 
     // データ取得関数を定義
     const fetchTasks = useCallback(async () => {
@@ -52,9 +61,22 @@ export default function DashboardPage() {
         }
     }, []);
 
+    // ★追加: 個人フロー取得
+    const fetchPersonalGroups = useCallback(async () => {
+        try {
+            const res = await fetch("/api/task-groups");
+            if (res.ok) {
+                setPersonalGroups(await res.json());
+            }
+        } catch (error) {
+            console.error(error);
+        }
+    }, []);
+
     useEffect(() => {
         // 初回ロード
         fetchTasks();
+        fetchPersonalGroups(); // ★追加
 
         // イベントハンドラー
         const handleTaskCreated = () => {
@@ -68,9 +90,9 @@ export default function DashboardPage() {
         return () => {
             window.removeEventListener("taskCreated", handleTaskCreated);
         };
-    }, [fetchTasks]);
+    }, [fetchTasks, fetchPersonalGroups]); // ★追加
 
-    // チームデータ取得関数を定義 (useCallbackを使用)
+    // チームデータ取得関数を定義
     const fetchTeams = useCallback(async () => {
         try {
             const res = await api.teams.$get();
@@ -92,7 +114,7 @@ export default function DashboardPage() {
             fetchTeams();
         };
 
-        // カスタムイベントを購読 ("teamCreated" イベント)
+        // カスタムイベントを購読
         window.addEventListener("teamCreated", handleTeamCreated);
 
         return () => {
@@ -113,10 +135,38 @@ export default function DashboardPage() {
             <div className="pt-24 px-6 max-w-5xl mx-auto pb-20">
                 <div className="flex">
                     <h1 className="text-2xl font-bold mt-4 mb-6">ダッシュボード</h1>
-                    <div className="ml-auto mt-4 mb-6">
+                    <div className="ml-auto mt-4 mb-6 flex gap-2"> {/* flex gap-2に変更 */}
+                        <div className="scale-90 origin-right">
+                            <CreateTaskGroup onGroupCreated={fetchPersonalGroups} /> {/* チームIDなしで呼び出し */}
+                        </div>
                         <CreateMyTask />
                     </div>
                 </div>
+
+                {/* ★追加: 個人フロー一覧エリア */}
+                <h1 className="text-lg font-medium mb-2">個人フロー</h1>
+                <Divider className="mb-6" />
+                <div className="mb-10">
+                    {personalGroups.length === 0 ? (
+                        <p className="text-gray-500 text-sm">作成された個人的なフローはありません</p>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {personalGroups.map((group) => (
+                                <Link href={`/groups/${group.id}`} key={group.id} className="block group">
+                                    <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-all">
+                                        <h3 className="font-bold text-gray-800 group-hover:text-blue-600 mb-1">
+                                            {group.title}
+                                        </h3>
+                                        <p className="text-xs text-gray-500 line-clamp-1">
+                                            {group.description || "説明なし"}
+                                        </p>
+                                    </div>
+                                </Link>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
                 <h1 className="text-lg font-medium mb-2">あなたのタスク一覧</h1>
                 <Divider className="mb-6" />
 
@@ -136,7 +186,7 @@ export default function DashboardPage() {
                                 <TaskCard
                                     id={task.id}
                                     title={task.title}
-                                    team={task.teamName || (task.teamId ? "チームタスク" : "個人用")} // チーム名があれば表示
+                                    team={task.teamName || (task.teamId ? "チームタスク" : "個人用")}
                                     status={task.status || "todo"}
                                     dueDate={formatDate(task.dueDate)}
                                     description={task.description || ""}
@@ -156,7 +206,6 @@ export default function DashboardPage() {
                 <Divider className="mb-6" />
                 <div className="grid gap-4">
                     {teams.map((team) => (
-                        // クリックで詳細ページへ飛ぶようにラップします
                         <Link key={team.id} href={`/teams/${team.id}`} className="block">
                             <div className="p-4 border rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow cursor-pointer flex justify-between items-center group">
                                 <div className="flex flex-col gap-1">

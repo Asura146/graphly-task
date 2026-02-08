@@ -8,7 +8,7 @@ import {
 import { useRouter } from "next/navigation";
 
 interface CreateTaskGroupProps {
-    teamId: string;
+    teamId?: string | null;
     onGroupCreated?: () => void;
 }
 

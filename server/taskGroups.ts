@@ -5,7 +5,7 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { nanoid } from "nanoid";
 import { Env } from "@/server";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, isNull, desc } from "drizzle-orm";
 
 const createGroupSchema = z.object({
     title: z.string().min(1),
@@ -29,6 +29,30 @@ const saveFlowSchema = z.object({
 });
 
 export const taskGroupRoute = new Hono<Env>()
+    // ★追加: 個人のタスクグループ一覧を取得 (GET /api/task-groups/)
+    .get("/", async (c) => {
+        const user = c.get("user");
+        if (!user) return c.json({ error: "Unauthorized" }, 401);
+
+        try {
+            const groups = await db
+                .select()
+                .from(taskGroups)
+                .where(
+                    and(
+                        eq(taskGroups.creatorId, user.id),
+                        isNull(taskGroups.teamId) // チームに属さないもの
+                    )
+                )
+                .orderBy(desc(taskGroups.createdAt));
+            
+            return c.json(groups);
+        } catch (error) {
+            console.error(error);
+            return c.json({ error: "Failed to fetch task groups" }, 500);
+        }
+    })
+
     // グループ作成
     .post("/", zValidator("json", createGroupSchema), async (c) => {
         const user = c.get("user");
