@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback } from "react";
 import TaskCard from "@/components/TaskCard";
 import { Divider, Button } from "@heroui/react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 interface Task {
@@ -18,7 +17,7 @@ interface Task {
     groupTitle: string | null;
 }
 
-export default function TasksPage() {
+export default function CompletedTasksPage() {
     const [tasks, setTasks] = useState<Task[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const router = useRouter();
@@ -29,14 +28,14 @@ export default function TasksPage() {
             if (res.ok) {
                 const data: Task[] = await res.json();
                 
-                // ★修正: 完了(DONE)以外のタスクのみをフィルタリング
-                const activeTasks = data.filter(t => t.status !== "DONE");
+                // 完了(DONE)のみをフィルタリング
+                const completedTasks = data.filter(t => t.status === "DONE");
 
-                // 期限が近い順にソート
-                const sortedData = activeTasks.sort((a, b) => {
-                    if (!a.dueDate) return 1;
-                    if (!b.dueDate) return -1;
-                    return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+                // 日付順にソート（新しい順）
+                const sortedData = completedTasks.sort((a, b) => {
+                    const dateA = a.dueDate ? new Date(a.dueDate).getTime() : 0;
+                    const dateB = b.dueDate ? new Date(b.dueDate).getTime() : 0;
+                    return dateB - dateA; // 降順
                 });
 
                 setTasks(sortedData);
@@ -70,23 +69,11 @@ export default function TasksPage() {
                         <Button 
                             variant="light" 
                             className="mb-2 text-gray-500 pl-0 hover:text-gray-800" 
-                            onPress={() => router.push("/dashboard")}
+                            onPress={() => router.push("/tasks")}
                         >
-                            ← ダッシュボードへ戻る
+                            ← タスク一覧へ戻る
                         </Button>
-                        <h1 className="text-2xl font-bold">タスク一覧 (未完了)</h1>
-                    </div>
-                    {/* 完了済みへのリンク */}
-                    <div className="mb-1">
-                        <Button
-                            as={Link}
-                            href="/tasks/completed"
-                            color="success"
-                            variant="flat"
-                            size="sm"
-                        >
-                            完了済みタスクを見る
-                        </Button>
+                        <h1 className="text-2xl font-bold text-gray-600">完了済みタスク</h1>
                     </div>
                 </div>
 
@@ -98,27 +85,17 @@ export default function TasksPage() {
                     </div>
                 ) : tasks.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-20 text-gray-500">
-                        <p>未完了のタスクはありません。</p>
-                        <div className="mt-4">
-                            <Button 
-                                as={Link}
-                                href="/tasks/completed"
-                                variant="light"
-                                color="primary"
-                            >
-                                完了済みのタスクを確認する
-                            </Button>
-                        </div>
+                        <p>完了したタスクはありません。</p>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                         {tasks.map((task) => (
-                            <div key={task.id} className="flex justify-center">
+                            <div key={task.id} className="flex justify-center opacity-75 hover:opacity-100 transition-opacity">
                                 <TaskCard
                                     id={task.id}
                                     title={task.title}
                                     team={task.teamName || (task.teamId ? "チームタスク" : "個人用")}
-                                    status={task.status || "todo"}
+                                    status={task.status || "done"}
                                     dueDate={formatDate(task.dueDate)}
                                     description={task.description || ""}
                                     groupId={task.groupId}

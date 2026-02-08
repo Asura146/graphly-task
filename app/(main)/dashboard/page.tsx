@@ -140,10 +140,10 @@ export default function DashboardPage() {
                 <div className="flex">
                     <h1 className="text-2xl font-bold mt-4 mb-6">ダッシュボード</h1>
                     <div className="ml-auto mt-4 mb-6 flex gap-2"> {/* flex gap-2に変更 */}
-                        {/* ★追加: 完了済みタスク一覧へのリンク */}
+                        {/* ★修正: リンク先を /tasks/completed に変更 */}
                         <Button 
                             as={Link} 
-                            href="/tasks" 
+                            href="/tasks/completed" 
                             size="sm" 
                             variant="flat" 
                             className="mr-2"
