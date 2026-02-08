@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, use } from "react";
 import TaskCard from "@/components/TaskCard";
 import CreateMyTask from "@/components/CreateMyTask";
 import { CreateTaskGroup } from "@/components/CreateTaskGroup"; // ★追加
-import { Divider, Button, Spinner } from "@heroui/react";
+import { Divider, Button, Spinner, CardHeader, CardBody, Card, Chip } from "@heroui/react";
 import { CreateTeam } from "@/components/CreateTeam";
 import { api } from "@/lib/hono";
 import { InferResponseType } from "hono/client";
@@ -156,7 +156,7 @@ export default function DashboardPage() {
                     </div>
                 </div>
 
-                {/* ★追加: 個人フロー一覧エリア */}
+                {/* 個人フロー一覧 */}
                 <h1 className="text-lg font-medium mb-2">個人フロー</h1>
                 <Divider className="mb-6" />
                 <div className="mb-10">
@@ -227,28 +227,28 @@ export default function DashboardPage() {
                 )}
                 <div className="flex">
                     <h1 className="text-lg font-medium mb-2 pt-5">所属チーム一覧</h1>
-                    <div className="ml-auto mt-4 mb-6">
+                    <div className="ml-auto mt-4 mb-2">
                         <CreateTeam />
                     </div>
                 </div>
                 <Divider className="mb-6" />
-                <div className="grid gap-4">
+                <div className="grid gap-4 flex-cols-1 md:grid-cols-2 lg:grid-cols-3">
                     {teams.map((team) => (
                         <Link key={team.id} href={`/teams/${team.id}`} className="block">
-                            <div className="p-4 border rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow cursor-pointer flex justify-between items-center group">
-                                <div className="flex flex-col gap-1">
-                                    <div className="flex items-center gap-3">
-                                        <h3 className="font-bold text-lg group-hover:text-blue-600 transition-colors">{team.name}</h3>
-                                        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded border border-gray-200">
+                            <Card className="hover:shadow-lg transition-shadow cursor-pointer max-w-md" shadow="sm">
+                                <CardBody>
+                                    <div className="flex items-center">
+                                        <h3 className="font-bold text-lg">{team.name}</h3>
+                                        <span className="text-xs bg-gray-100 text-gray-600 px-3 py-1 rounded-full border border-gray-200 ml-auto">
                                             {team.role}
                                         </span>
                                     </div>
+                                    
+                                    <Divider className="my-2" />
+                                    
                                     <p className="text-sm text-gray-500">{team.description}</p>
-                                </div>
-                                <div className="text-gray-400 group-hover:text-blue-500">
-                                    →
-                                </div>
-                            </div>
+                                </CardBody>
+                            </Card>
                         </Link>
                     ))}
                     {teams.length === 0 && <p className="text-gray-500">所属しているチームはありません</p>}
