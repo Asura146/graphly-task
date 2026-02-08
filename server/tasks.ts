@@ -1,8 +1,8 @@
 // server/routes/tasks.ts
 import { Hono } from "hono";
 import { db } from "@/lib/db";
-import { tasks } from "@/db/schema";
-import { eq, or, and, isNull, desc } from "drizzle-orm";
+import { tasks, teams, teamMembers, taskGroups } from "@/db/schema"; 
+import { eq, or, and, isNull } from "drizzle-orm";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { nanoid } from "nanoid";
@@ -15,6 +15,8 @@ const createTaskSchema = z.object({
   teamId: z.string().nullable().optional(),
   assigneeId: z.string().nullable().optional(),
   dueDate: z.string().optional(),
+  // ★追加: タスクグループIDを受け取れるようにする
+  taskGroupId: z.string().nullable().optional(),
 });
 const updateTaskSchema = z.object({
   title: z.string().min(1).optional(),
@@ -35,11 +37,27 @@ export const taskRoute = new Hono<Env>() // index.tsと同じ型を渡す
       return c.json({ error: "Unauthorized" }, 401);
     }
 
-    // あとはユーザーIDを使ってDBから取得
     const userId = user.id;
+    // selectで取得するフィールドを明示し、teamsと結合
     const data = await db
-      .select()
+      .select({
+        id: tasks.id,
+        title: tasks.title,
+        description: tasks.description,
+        dueDate: tasks.dueDate,
+        teamId: tasks.teamId,
+        status: tasks.status,
+        creatorId: tasks.creatorId,
+        assigneeId: tasks.assigneeId,
+        teamName: teams.name, // チーム名を取得
+        // ★追加: グループ情報を取得
+        groupId: tasks.taskGroupId,
+        groupTitle: taskGroups.title,
+      })
       .from(tasks)
+      .leftJoin(teams, eq(tasks.teamId, teams.id)) // チームテーブルと結合
+      // ★追加: タスクグループテーブルと結合
+      .leftJoin(taskGroups, eq(tasks.taskGroupId, taskGroups.id))
       .where(
         or(
           eq(tasks.assigneeId, userId),
@@ -77,11 +95,14 @@ export const taskRoute = new Hono<Env>() // index.tsと同じ型を渡す
           title: body.title,
           description: body.description ?? null,
           teamId: body.teamId ?? null,
+          // ★追加: グループIDを保存
+          taskGroupId: body.taskGroupId ?? null,
           creatorId: user.id,
           assigneeId: finalAssigneeId, // 決定した担当者IDをセット
           dueDate: body.dueDate ? new Date(body.dueDate) : null,
-          positionX: 0,
-          positionY: 0,
+          // 初期位置は少しずらすと重ならない
+          positionX: 100,
+          positionY: 100,
         })
         .returning();
   
@@ -101,6 +122,40 @@ export const taskRoute = new Hono<Env>() // index.tsと同じ型を渡す
     const body = c.req.valid("json");
 
     try {
+      // 1. まずターゲットとなるタスクを取得して権限チェックを行う
+      const [targetTask] = await db
+        .select()
+        .from(tasks)
+        .where(eq(tasks.id, taskId))
+        .limit(1);
+
+      if (!targetTask) return c.json({ error: "Task not found" }, 404);
+
+      let isAuthorized = false;
+
+      // 条件A: 自分が作成者、または現在の担当者であればOK
+      if (targetTask.creatorId === user.id || targetTask.assigneeId === user.id) {
+        isAuthorized = true;
+      } 
+      // 条件B: チームタスクの場合、そのチームのメンバーであればOK
+      else if (targetTask.teamId) {
+        const [member] = await db
+          .select()
+          .from(teamMembers)
+          .where(and(
+            eq(teamMembers.teamId, targetTask.teamId),
+            eq(teamMembers.userId, user.id)
+          ))
+          .limit(1);
+        
+        if (member) isAuthorized = true;
+      }
+
+      if (!isAuthorized) {
+        return c.json({ error: "Forbidden" }, 403);
+      }
+
+      // 2. 権限確認ができたら更新を実行
       const [updatedTask] = await db
         .update(tasks)
         .set({
@@ -108,19 +163,12 @@ export const taskRoute = new Hono<Env>() // index.tsと同じ型を渡す
           dueDate: body.dueDate ? new Date(body.dueDate) : undefined,
           updatedAt: new Date(),
         })
-        .where(
-          and(
-            eq(tasks.id, taskId),
-            // セキュリティ: 自分の個人タスクか、チームタスクであること
-            // (本来はチームメンバーかどうかの判定を入れるのがベスト)
-            or(eq(tasks.creatorId, user.id), eq(tasks.assigneeId, user.id))
-          )
-        )
+        .where(eq(tasks.id, taskId)) // ID指定のみで更新
         .returning();
 
-      if (!updatedTask) return c.json({ error: "Task not found or forbidden" }, 404);
       return c.json(updatedTask);
     } catch (e) {
+      console.error(e);
       return c.json({ error: "Update failed" }, 500);
     }
   })
@@ -132,19 +180,48 @@ export const taskRoute = new Hono<Env>() // index.tsと同じ型を渡す
     if (!user) return c.json({ error: "Unauthorized" }, 401);
 
     try {
+      // 1. まずターゲットとなるタスクを取得して権限チェックを行う
+      const [targetTask] = await db
+        .select()
+        .from(tasks)
+        .where(eq(tasks.id, taskId))
+        .limit(1);
+
+      if (!targetTask) return c.json({ error: "Task not found" }, 404);
+
+      let isAuthorized = false;
+
+      // 自分が作成者であれば削除可能
+      if (targetTask.creatorId === user.id) {
+        isAuthorized = true;
+      } 
+      // チームタスクの場合、そのチームのメンバーであれば削除可能
+      else if (targetTask.teamId) {
+        const [member] = await db
+          .select()
+          .from(teamMembers)
+          .where(and(
+            eq(teamMembers.teamId, targetTask.teamId),
+            eq(teamMembers.userId, user.id)
+          ))
+          .limit(1);
+        
+        if (member) isAuthorized = true;
+      }
+
+      if (!isAuthorized) {
+        return c.json({ error: "Forbidden" }, 403);
+      }
+
+      // 2. 権限があれば削除を実行
       const [deletedTask] = await db
         .delete(tasks)
-        .where(
-          and(
-            eq(tasks.id, taskId),
-            eq(tasks.creatorId, user.id) // 作成者のみ削除可能とする
-          )
-        )
+        .where(eq(tasks.id, taskId))
         .returning();
 
-      if (!deletedTask) return c.json({ error: "Task not found or forbidden" }, 404);
       return c.json({ success: true, id: deletedTask.id });
     } catch (e) {
+      console.error(e);
       return c.json({ error: "Delete failed" }, 500);
     }
   });
