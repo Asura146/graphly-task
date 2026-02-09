@@ -194,7 +194,7 @@ export default function DashboardPage() {
                     </div>
                 )}
                 <div className="flex pt-12 items-center mb-2">
-                    <h1 className="text-lg font-medium">所属チーム一覧</h1>
+                    <h1 className="text-lg font-semibold">所属チーム一覧</h1>
                     <div className="ml-auto">
                         <CreateTeam />
                     </div>
@@ -223,7 +223,7 @@ export default function DashboardPage() {
                 </div>
                 {/* 個人フロー一覧 */}
                 <div className="flex pt-12 items-center mb-2">
-                    <h1 className="text-lg font-medium">個人フロー</h1>
+                    <h1 className="text-lg font-semibold">個人フロー</h1>
                     <div className="ml-auto">
                         <CreateTaskGroup onGroupCreated={fetchPersonalGroups} /> {/* チームIDなしで呼び出し */}
                     </div>
