@@ -280,8 +280,9 @@ export default function TaskFlow({ groupId, teamId, initialTasks, initialEdges, 
                 {/* 保存ボタン */}
                 <Panel position="top-right" className="flex gap-2 bg-white/80 p-2 rounded-lg shadow-sm backdrop-blur-sm">
                     <Button 
-                        size="sm" 
-                        color="primary" 
+                        size='sm'
+                        color='success'
+                        className='text-white p-4'
                         onPress={handleSave}
                         isLoading={isSaving} // ローディング表示
                     >
