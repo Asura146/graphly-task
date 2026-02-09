@@ -65,7 +65,7 @@ export function CreateGroupTask({ teamId, groupId, members, onTaskCreated }: Cre
 
   return (
     <>
-      <Button onPress={onOpen} color="secondary" className="w-full font-semibold shadow-sm">
+      <Button onPress={onOpen} className="w-full font-semibold shadow-sm bg-black text-white hover:bg-gray-800">
         ＋ タスクを追加
       </Button>
       <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
@@ -116,7 +116,7 @@ export function CreateGroupTask({ teamId, groupId, members, onTaskCreated }: Cre
               <ModalFooter>
                 <Button variant="light" onPress={onClose}>キャンセル</Button>
                 <Button 
-                  color="primary" 
+                  className="bg-black text-white hover:bg-gray-800"
                   isLoading={isLoading} 
                   onPress={() => handleCreate(onClose)}
                   isDisabled={!title}

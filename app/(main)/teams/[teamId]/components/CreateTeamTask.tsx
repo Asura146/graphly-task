@@ -68,7 +68,7 @@ export function CreateTeamTask({ teamId, members, onTaskCreated }: CreateTeamTas
 
   return (
     <>
-        <Button onPress={onOpen} color="primary">
+        <Button onPress={onOpen} className="font-medium shadow-md" variant="flat" color="primary">
             ＋ タスクを追加
         </Button>
         <Modal isOpen={isOpen} onOpenChange={onOpenChange}>

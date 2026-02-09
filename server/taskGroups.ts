@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { db } from "@/lib/db";
-import { taskGroups, tasks, taskDependencies } from "@/db/schema";
+import { taskGroups, tasks, taskDependencies, user as users } from "@/db/schema";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { nanoid } from "nanoid";
@@ -22,14 +22,13 @@ const saveFlowSchema = z.object({
     edges: z.array(z.object({
         source: z.string(),
         target: z.string(),
-        // ★追加: ハンドルIDを受け取る
         sourceHandle: z.string().nullable().optional(),
         targetHandle: z.string().nullable().optional(),
     })).optional(),
 });
 
 export const taskGroupRoute = new Hono<Env>()
-    // ★追加: 個人のタスクグループ一覧を取得 (GET /api/task-groups/)
+    //　個人のタスクグループ一覧を取得 (GET /api/task-groups/)
     .get("/", async (c) => {
         const user = c.get("user");
         if (!user) return c.json({ error: "Unauthorized" }, 401);
@@ -84,7 +83,25 @@ export const taskGroupRoute = new Hono<Env>()
         if (!group) return c.json({ error: "Group not found" }, 404);
 
         // 2. 所属するタスクの取得
-        const groupTasks = await db.select().from(tasks).where(eq(tasks.taskGroupId, groupId));
+        const groupTasks = await db
+            .select({
+                id: tasks.id,
+                title: tasks.title,
+                description: tasks.description,
+                status: tasks.status,
+                dueDate: tasks.dueDate,
+                assigneeId: tasks.assigneeId,
+                // React Flow用の座標は必須
+                positionX: tasks.positionX,
+                positionY: tasks.positionY,
+                // ★追加: 担当者名
+                assigneeName: users.name,
+                teamId: tasks.teamId,
+                taskGroupId: tasks.taskGroupId,
+            })
+            .from(tasks)
+            .leftJoin(users, eq(tasks.assigneeId, users.id)) // JOINを追加
+            .where(eq(tasks.taskGroupId, groupId));
 
         // 3. 依存関係（エッジ）の取得
         const taskIds = groupTasks.map(t => t.id);
@@ -99,7 +116,6 @@ export const taskGroupRoute = new Hono<Env>()
                     id: d.id, 
                     source: d.predecessorId, 
                     target: d.successorId,
-                    // ★追加: ハンドル情報を返す
                     sourceHandle: d.sourceHandle,
                     targetHandle: d.targetHandle
                 }));
@@ -115,7 +131,6 @@ export const taskGroupRoute = new Hono<Env>()
         try {
             await db.transaction(async (tx) => {
                 // 1. 座標の更新
-                // ここはループで1つずつ更新せざるを得ないが、ID指定なので高速
                 for (const t of updatedPositions) {
                      await tx.update(tasks)
                         .set({ positionX: t.position.x, positionY: t.position.y })
@@ -151,7 +166,6 @@ export const taskGroupRoute = new Hono<Env>()
                         id: `dep_${nanoid()}`,
                         predecessorId: edge.source,
                         successorId: edge.target,
-                        // ★追加: ハンドル情報を保存
                         sourceHandle: edge.sourceHandle ?? null,
                         targetHandle: edge.targetHandle ?? null,
                     }));

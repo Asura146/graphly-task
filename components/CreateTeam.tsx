@@ -23,7 +23,7 @@ export function CreateTeam() {
       });
 
       if (res.ok) {
-        // ★追加: チーム作成イベントを発行してダッシュボードに通知
+        // チーム作成イベントを発行してダッシュボードに通知
         if (typeof window !== "undefined") {
             window.dispatchEvent(new Event("teamCreated"));
         }
@@ -42,7 +42,7 @@ export function CreateTeam() {
 
   return (
     <>
-      <Button onPress={onOpen} color="primary">チームを作成</Button>
+      <Button onPress={onOpen} color="primary" variant="flat">＋ チームを作成</Button>
       <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
         <ModalContent>
           {(onClose) => (

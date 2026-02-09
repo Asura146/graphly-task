@@ -46,8 +46,8 @@ export function CreateTaskGroup({ teamId, onGroupCreated }: CreateTaskGroupProps
 
   return (
     <>
-      <Button onPress={onOpen} color="secondary" variant="flat">
-        ＋ フロー作成
+      <Button onPress={onOpen} color="primary" variant="flat" className="font-medium shadow-md">
+        ＋ タスクグループ作成
       </Button>
       <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
         <ModalContent>

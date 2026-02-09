@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth"
 import { taskRoute } from "./tasks";
 import { teamRoute } from "./teams";
 import { taskGroupRoute } from "./taskGroups"; // 追加
+import { userRoute } from "./users"; // インポートを追加
 
 export type Env = {
     Variables: {
@@ -34,7 +35,8 @@ const routes = app
 .route("/auth", authRoute)
 .route("/teams", teamRoute)
 .route("/tasks", taskRoute)
-.route("/task-groups", taskGroupRoute); // 追加
+.route("/task-groups", taskGroupRoute) // 追加
+.route("/users", userRoute); // ★追加
 
 export default app;
 export type AppType = typeof routes;

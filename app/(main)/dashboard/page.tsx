@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, use } from "react";
 import TaskCard from "@/components/TaskCard";
 import CreateMyTask from "@/components/CreateMyTask";
 import { CreateTaskGroup } from "@/components/CreateTaskGroup"; // ★追加
-import { Divider } from "@heroui/react";
+import { Divider, Button, Spinner, CardHeader, CardBody, Card, Avatar} from "@heroui/react";
 import { CreateTeam } from "@/components/CreateTeam";
 import { api } from "@/lib/hono";
 import { InferResponseType } from "hono/client";
@@ -17,7 +17,7 @@ interface Task {
     description: string | null;
     dueDate: string | null;
     teamId: string | null;
-    status?: "todo" | "in_progress" | "done";
+    status?: string;
     teamName?: string | null;
     groupId: string | null;
     groupTitle: string | null;
@@ -45,8 +45,11 @@ export default function DashboardPage() {
             if (res.ok) {
                 const data: Task[] = await res.json();
 
+                // ★修正: 完了(DONE)以外のタスクのみをフィルタリング
+                const activeTasks = data.filter(t => t.status !== "DONE");
+
                 // 期限が近い順にソート (nullは後ろへ)
-                const sortedData = data.sort((a, b) => {
+                const sortedData = activeTasks.sort((a, b) => {
                     if (!a.dueDate) return 1;
                     if (!b.dueDate) return -1;
                     return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
@@ -132,47 +135,39 @@ export default function DashboardPage() {
 
     return (
         <div className="bg-gray-100 w-full min-h-screen">
-            <div className="pt-24 px-6 max-w-5xl mx-auto pb-20">
+            <div className="pt-24 px-6 max-w-6xl mx-auto pb-20">
                 <div className="flex">
                     <h1 className="text-2xl font-bold mt-4 mb-6">ダッシュボード</h1>
-                    <div className="ml-auto mt-4 mb-6 flex gap-2"> {/* flex gap-2に変更 */}
-                        <div className="scale-90 origin-right">
-                            <CreateTaskGroup onGroupCreated={fetchPersonalGroups} /> {/* チームIDなしで呼び出し */}
+                    <div className="ml-auto mt-4 mb-6 flex gap-2">
+                        <div className="mr-2">
+                            <CreateMyTask />
                         </div>
-                        <CreateMyTask />
                     </div>
                 </div>
 
-                {/* ★追加: 個人フロー一覧エリア */}
-                <h1 className="text-lg font-medium mb-2">個人フロー</h1>
-                <Divider className="mb-6" />
-                <div className="mb-10">
-                    {personalGroups.length === 0 ? (
-                        <p className="text-gray-500 text-sm">作成された個人的なフローはありません</p>
-                    ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {personalGroups.map((group) => (
-                                <Link href={`/groups/${group.id}`} key={group.id} className="block group">
-                                    <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-all">
-                                        <h3 className="font-bold text-gray-800 group-hover:text-blue-600 mb-1">
-                                            {group.title}
-                                        </h3>
-                                        <p className="text-xs text-gray-500 line-clamp-1">
-                                            {group.description || "説明なし"}
-                                        </p>
-                                    </div>
-                                </Link>
-                            ))}
-                        </div>
-                    )}
-                </div>
+                
 
-                <h1 className="text-lg font-medium mb-2">あなたのタスク一覧</h1>
-                <Divider className="mb-6" />
+                <div className="flex">
+                    <h1 className="text-lg font-semibold mb-2">あなたのタスク</h1>
+                    <div className="ml-auto mb-2">
+                    <Button 
+                            as={Link} 
+                            href="/tasks" 
+                            size="sm" 
+                            variant="flat" 
+                            className="mr-2"
+                        >
+                            <p className="mx-1">タスク一覧→</p>
+                        </Button>
+
+                    </div>
+                </div>
+                
+                <Divider/>
 
                 {isLoading ? (
                     <div className="flex justify-center items-center py-20">
-                        <div className="text-gray-500">読み込み中...</div>
+                        <Spinner size="lg" />
                     </div>
                 ) : tasks.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-20 text-gray-500">
@@ -180,9 +175,9 @@ export default function DashboardPage() {
                         <p className="text-sm mt-2">ヘッダーの「＋タスクを追加」から作成できます。</p>
                     </div>
                 ) : (
-                    <div className="flex overflow-x-auto grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 place-items-center">
+                    <div className="flex overflow-x-auto grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 place-items-center">
                         {tasks.map((task) => (
-                            <div key={task.id} className="flex-shrink-0">
+                            <div key={task.id} className="flex-shrink-0 my-4">
                                 <TaskCard
                                     id={task.id}
                                     title={task.title}
@@ -197,33 +192,73 @@ export default function DashboardPage() {
                         ))}
                     </div>
                 )}
-                <div className="flex">
-                    <h1 className="text-lg font-medium mb-2 pt-5">所属チーム一覧</h1>
-                    <div className="ml-auto mt-4 mb-6">
+                <div className="flex pt-12 items-center mb-2">
+                    <h1 className="text-lg font-semibold">所属チーム一覧</h1>
+                    <div className="ml-auto">
                         <CreateTeam />
                     </div>
                 </div>
                 <Divider className="mb-6" />
-                <div className="grid gap-4">
+                <div className="grid gap-4 flex-cols-1 md:grid-cols-2 lg:grid-cols-3">
                     {teams.map((team) => (
                         <Link key={team.id} href={`/teams/${team.id}`} className="block">
-                            <div className="p-4 border rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow cursor-pointer flex justify-between items-center group">
-                                <div className="flex flex-col gap-1">
-                                    <div className="flex items-center gap-3">
-                                        <h3 className="font-bold text-lg group-hover:text-blue-600 transition-colors">{team.name}</h3>
-                                        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded border border-gray-200">
+                            <Card className="hover:shadow-lg transition-shadow cursor-pointer max-w-md" shadow="sm">
+                                <CardBody className="p-4">
+                                    <Avatar 
+                                        name={team.name} 
+                                        className="w-12 h-12 text-large mb-3"
+                                    />
+                                    <div className="flex items-center">
+                                        <h3 className="font-bold text-lg">{team.name}</h3>
+                                        <span className="text-xs bg-gray-100 text-gray-600 px-3 py-1 rounded-full border border-gray-200 ml-auto">
                                             {team.role}
                                         </span>
                                     </div>
+                                    
+                                    <Divider className="my-2" />
+                                    
                                     <p className="text-sm text-gray-500">{team.description}</p>
-                                </div>
-                                <div className="text-gray-400 group-hover:text-blue-500">
-                                    →
-                                </div>
-                            </div>
+                                </CardBody>
+                            </Card>
                         </Link>
                     ))}
                     {teams.length === 0 && <p className="text-gray-500">所属しているチームはありません</p>}
+                </div>
+                {/* 個人フロー一覧 */}
+                <div className="flex pt-12 items-center mb-2">
+                    <h1 className="text-lg font-semibold">個人フロー</h1>
+                    <div className="ml-auto">
+                        <CreateTaskGroup onGroupCreated={fetchPersonalGroups} /> {/* チームIDなしで呼び出し */}
+                    </div>
+                </div>
+                
+                <Divider className="mb-6" />
+                <div className="mb-10">
+                    {personalGroups.length === 0 ? (
+                        <p className="text-gray-500 text-sm">作成された個人的なフローはありません</p>
+                    ) : (
+                        <div className="grid gap-4 flex-cols-1 md:grid-cols-2 lg:grid-cols-3">
+                            {personalGroups.map((group) => (
+                                <Link href={`/groups/${group.id}`} key={group.id} className="block group">
+                                    <Card className="hover:shadow-lg transition-shadow cursor-pointer max-w-md" shadow="sm">
+                                        <CardBody className="p-4">
+                                        <Avatar 
+                                            name={group.title} 
+                                            className="w-12 h-12 text-large mb-3"
+                                        />
+                                        <h3 className="font-bold text-lg">
+                                            {group.title}
+                                        </h3>
+                                        <Divider className="my-2" />
+                                        <p className="text-sm text-gray-500">
+                                            {group.description || "説明なし"}
+                                        </p>
+                                        </CardBody>
+                                    </Card>
+                                </Link>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
