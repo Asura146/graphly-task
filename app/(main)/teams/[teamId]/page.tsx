@@ -125,13 +125,13 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
                     >
                         ← ダッシュボードへ戻る
                     </Button>
-                    <div className="flex justify-between items-end">
+                    <div className="md:flex justify-between items-end">
                         <div>
                             <h1 className="text-3xl font-bold text-gray-800">{team.name}</h1>
                             <p className="text-gray-500 mt-2">{team.description}</p>
                         </div>
                         {/* ★追加: グループ作成ボタンを表示 */}
-                        <div className="mb-1 flex">
+                        <div className="mb-1 flex justify-end mt-4 md:mt-0">
                             <div className="mr-4">
                                 <CreateTeamTask 
                                     teamId={teamId} 
