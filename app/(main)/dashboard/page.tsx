@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, use } from "react";
 import TaskCard from "@/components/TaskCard";
 import CreateMyTask from "@/components/CreateMyTask";
 import { CreateTaskGroup } from "@/components/CreateTaskGroup"; // ★追加
-import { Divider, Button, Spinner, CardHeader, CardBody, Card, Chip } from "@heroui/react";
+import { Divider, Button, Spinner, CardHeader, CardBody, Card, Avatar} from "@heroui/react";
 import { CreateTeam } from "@/components/CreateTeam";
 import { api } from "@/lib/hono";
 import { InferResponseType } from "hono/client";
@@ -142,7 +142,6 @@ export default function DashboardPage() {
                         <div className="mr-2">
                             <CreateMyTask />
                         </div>
-                        
                     </div>
                 </div>
 
@@ -205,6 +204,10 @@ export default function DashboardPage() {
                         <Link key={team.id} href={`/teams/${team.id}`} className="block">
                             <Card className="hover:shadow-lg transition-shadow cursor-pointer max-w-md" shadow="sm">
                                 <CardBody className="p-4">
+                                    <Avatar 
+                                        name={team.name} 
+                                        className="w-12 h-12 text-large mb-3"
+                                    />
                                     <div className="flex items-center">
                                         <h3 className="font-bold text-lg">{team.name}</h3>
                                         <span className="text-xs bg-gray-100 text-gray-600 px-3 py-1 rounded-full border border-gray-200 ml-auto">
@@ -239,6 +242,10 @@ export default function DashboardPage() {
                                 <Link href={`/groups/${group.id}`} key={group.id} className="block group">
                                     <Card className="hover:shadow-lg transition-shadow cursor-pointer max-w-md" shadow="sm">
                                         <CardBody className="p-4">
+                                        <Avatar 
+                                            name={group.title} 
+                                            className="w-12 h-12 text-large mb-3"
+                                        />
                                         <h3 className="font-bold text-lg">
                                             {group.title}
                                         </h3>
