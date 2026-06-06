@@ -51,51 +51,95 @@ export const teamRoute = new Hono<Env>()
     })
     // メンバー追加API (メールアドレスで招待)
     .post("/:id/members", zValidator("json", inviteMemberSchema), async (c) => {
-        const user = c.get("user");
-        if (!user) return c.json({ error: "Unauthorized" }, 401);
-        
-        const teamId = c.req.param("id");
-        const { email } = c.req.valid("json");
+      const user = c.get("user");
+      if (!user) return c.json({ error: "Unauthorized" }, 401);
 
-        try {
-            // 1. 招待するユーザーが存在するか確認
-            const [targetUser] = await db
-                .select()
-                .from(users)
-                .where(eq(users.email, email))
-                .limit(1);
+      const teamId = c.req.param("id");
+      const { email } = c.req.valid("json");
 
-            if (!targetUser) {
-                return c.json({ error: "User not found" }, 404);
-            }
+      try {
+        // トランザクション内でチーム存在確認・権限チェック・ユーザー作成・メンバー追加を一貫して行う
+        const result = await db.transaction(async (tx) => {
+          // チームが存在するか確認
+          const [teamRow] = await tx
+            .select()
+            .from(teams)
+            .where(eq(teams.id, teamId))
+            .limit(1);
 
-            // 2. 既にメンバーになっていないか確認
-            const [existingMember] = await db
-                .select()
-                .from(teamMembers)
-                .where(and(
-                    eq(teamMembers.teamId, teamId),
-                    eq(teamMembers.userId, targetUser.id)
-                ))
-                .limit(1);
+          if (!teamRow) return { status: 404, body: { error: "Team not found" } };
 
-            if (existingMember) {
-                return c.json({ error: "User is already a member" }, 409);
-            }
+          // 招待を行うユーザーがそのチームのADMINか確認
+          const [inviterMember] = await tx
+            .select()
+            .from(teamMembers)
+            .where(and(eq(teamMembers.teamId, teamId), eq(teamMembers.userId, user.id)))
+            .limit(1);
 
-            // 3. メンバーに追加
-            const [newMember] = await db.insert(teamMembers).values({
-                id: `tm_${nanoid()}`,
-                teamId: teamId,
-                userId: targetUser.id,
-                role: "MEMBER",
+          if (!inviterMember || inviterMember.role !== "ADMIN") {
+            return { status: 403, body: { error: "Forbidden" } };
+          }
+
+          // 招待対象ユーザーが存在するか確認
+          let [targetUser] = await tx
+            .select()
+            .from(users)
+            .where(eq(users.email, email))
+            .limit(1);
+
+          // 存在しなければプレースホルダユーザーを作成
+          if (!targetUser) {
+            const newUserId = `user_${nanoid()}`;
+            const now = new Date();
+            const [created] = await tx.insert(users).values({
+              id: newUserId,
+              name: email.split("@")[0],
+              email,
+              emailVerified: false,
+              image: null,
+              createdAt: now,
+              updatedAt: now,
+              role: null,
+              banned: false,
             }).returning();
+            targetUser = created;
+          }
 
-            return c.json(newMember, 201);
-        } catch (error) {
-            console.error(error);
-            return c.json({ error: "Failed to add member" }, 500);
-        }
+          // 既にメンバーになっていないか確認
+          const [existingMember] = await tx
+            .select()
+            .from(teamMembers)
+            .where(and(
+              eq(teamMembers.teamId, teamId),
+              eq(teamMembers.userId, targetUser.id)
+            ))
+            .limit(1);
+
+          if (existingMember) {
+            return { status: 409, body: { error: "User is already a member" } };
+          }
+
+          // メンバーに追加
+          const [newMember] = await tx.insert(teamMembers).values({
+            id: `tm_${nanoid()}`,
+            teamId: teamId,
+            userId: targetUser.id,
+            role: "MEMBER",
+          }).returning();
+
+          return { status: 201, body: newMember };
+        });
+
+        if (result.status === 201) return c.json(result.body, 201);
+        if (result.status === 403) return c.json(result.body, 403);
+        if (result.status === 404) return c.json(result.body, 404);
+        if (result.status === 409) return c.json(result.body, 409);
+
+        return c.json({ error: "Failed to add member" }, 500);
+      } catch (error) {
+        console.error(error);
+        return c.json({ error: "Failed to add member" }, 500);
+      }
     })
     .get("/", async (c) => {
         const user = c.get("user");
