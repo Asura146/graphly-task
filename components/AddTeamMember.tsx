@@ -6,11 +6,12 @@ import {
   useDisclosure, Button, Input 
 } from "@heroui/react";
 import { useRouter } from "next/navigation";
+import { UserPlus } from "lucide-react"; // 💡 アイコンをインポート
 
 interface AddTeamMemberProps {
     teamId: string;
     teamName: string;
-    onSuccess?: () => void; // 追加: 成功時のコールバック
+    onSuccess?: () => void;
 }
 
 export function AddTeamMember({ teamId, teamName, onSuccess }: AddTeamMemberProps) {
@@ -31,7 +32,7 @@ export function AddTeamMember({ teamId, teamName, onSuccess }: AddTeamMemberProp
       if (res.ok) {
         alert("メンバーを追加しました");
         router.refresh(); 
-        if (onSuccess) onSuccess(); // 成功時に実行
+        if (onSuccess) onSuccess();
         onClose();
         setEmail("");
       } else {
@@ -47,9 +48,17 @@ export function AddTeamMember({ teamId, teamName, onSuccess }: AddTeamMemberProp
 
   return (
     <>
-      <Button onPress={onOpen} size="sm" color="primary" className="font-medium">
-        ＋ メンバー招待
+      {/* 💡 ボタンをアイコン仕様に変更 */}
+      <Button 
+        onPress={onOpen} 
+        size="sm" 
+        color="primary" 
+        isIconOnly // 💡 アイコン専用の丸み/サイズにする設定
+        aria-label="メンバー招待" // 💡 アクセシビリティ（読み上げ）対策
+      >
+        <UserPlus size={18} /> {/* 💡 人とプラスのアイコン */}
       </Button>
+
       <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
         <ModalContent>
           {(onClose) => (
