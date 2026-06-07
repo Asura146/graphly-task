@@ -266,7 +266,7 @@ export default function TaskFlow({ groupId, teamId, initialTasks, initialEdges, 
             <ReactFlow
                 nodes={nodes}
                 edges={edges}
-                nodeTypes={nodeTypes} // カスタムノードを登録
+                nodeTypes={nodeTypes}
                 onNodesChange={onNodesChange}
                 onEdgesChange={onEdgesChange}
                 onConnect={onConnect}
@@ -277,28 +277,40 @@ export default function TaskFlow({ groupId, teamId, initialTasks, initialEdges, 
                 <MiniMap style={{ height: 100 }} zoomable pannable />
                 <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
                 
-                {/* 保存ボタン */}
-                <Panel position="top-right" className="flex gap-2 bg-white/80 p-2 rounded-lg shadow-sm backdrop-blur-sm">
-                    <Button 
-                        size='sm'
-                        color='success'
-                        className='text-white p-4'
-                        onPress={handleSave}
-                        isLoading={isSaving} // ローディング表示
-                    >
-                        配置を保存
-                    </Button>
-                </Panel>
+                {/* 1つのパネル（カード）にまとめる */}
+                <Panel position="top-left" className="m-3 pointer-events-none">
+                    
+                    {/* 一体型のカードコンテナ */}
+                    <div className="bg-white p-4 rounded-xl shadow-md border border-gray-100 w-full sm:w-64 flex flex-col gap-4 pointer-events-auto">
+                        
+                        <h3 className="text-sm font-bold text-gray-700">メニュー</h3>
 
-                {/* タスク追加パネル (置き換え) */}
-                <Panel position="top-left" className="bg-white p-3 rounded-xl shadow-md border border-gray-100 w-64">
-                    <h3 className="text-sm font-bold text-gray-700 mb-3 ml-1">アクション</h3>
-                    <CreateGroupTask 
-                        teamId={teamId}
-                        groupId={groupId}
-                        members={members}
-                        onTaskCreated={handleTaskCreated}
-                    />
+                        {/* タスク追加コンポーネント */}
+                        <div>
+                            <CreateGroupTask 
+                                teamId={teamId}
+                                groupId={groupId}
+                                members={members}
+                                onTaskCreated={handleTaskCreated}
+                            />
+                        </div>
+
+                        {/* 区切り線（デザインのアクセント） */}
+                        <div className="h-px w-full bg-gray-100" />
+
+                        {/* 保存ボタン */}
+                        <Button 
+                            size='sm'
+                            color='success'
+                            className='text-white font-medium w-full'
+                            onPress={handleSave}
+                            isLoading={isSaving}
+                        >
+                            配置を保存
+                        </Button>
+
+                    </div>
+
                 </Panel>
             </ReactFlow>
         </div>

@@ -7,6 +7,7 @@ import { Avatar } from "@heroui/react";
 import { Divider } from "@heroui/react";
 import Link from "next/link";
 import TaskCard from "@/components/TaskCard";
+import { AddTeamMember } from "@/components/AddTeamMember";
 import { api } from "@/lib/hono";
 import { CreateTaskGroup } from "@/components/CreateTaskGroup";
 import { CreateTeamTask } from "./components/CreateTeamTask";
@@ -127,11 +128,16 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
                     </Button>
                     <div className="md:flex justify-between items-end">
                         <div>
-                            <h1 className="text-3xl font-bold text-gray-800">{team.name}</h1>
+                            <div className="flex items-center gap-3">
+                                <h1 className="text-3xl font-bold text-gray-800">{team.name}</h1>
+                                <AddTeamMember teamId={teamId} teamName={team.name} onSuccess={fetchData} />
+                            </div>
+                            
                             <p className="text-gray-500 mt-2">{team.description}</p>
                         </div>
-                        {/* ★追加: グループ作成ボタンを表示 */}
-                        <div className="mb-1 flex justify-end mt-4 md:mt-0">
+                        {/* 招待ボタン / グループ作成ボタンを表示 */}
+                        <div className="mb-1 flex justify-end mt-4 md:mt-0 items-center">
+                            
                             <div className="mr-4">
                                 <CreateTeamTask 
                                     teamId={teamId} 
