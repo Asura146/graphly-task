@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@heroui/button";
 import { Input } from "@heroui/input";
 import { Divider } from "@heroui/react";
+import { api } from "@/lib/hono";
 import {
     Modal,
     ModalContent,
@@ -28,7 +29,7 @@ export default function SettingsPage() {
     useEffect(() => {
         const fetchUser = async () => {
             try {
-                const res = await fetch("/api/users/me");
+                const res = await api.users.me.$get();
                 if (res.ok) {
                     const data = await res.json();
                     setName(data.name);
@@ -46,10 +47,8 @@ export default function SettingsPage() {
     const handleUpdateName = async () => {
         setIsUpdating(true);
         try {
-            const res = await fetch("/api/users/me", {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ name }),
+            const res = await api.users.me.$patch({
+                json: { name },
             });
 
             if (res.ok) {
@@ -70,9 +69,7 @@ export default function SettingsPage() {
     const handleDeleteAccount = async () => {
         setIsDeleting(true);
         try {
-            const res = await fetch("/api/users/me", {
-                method: "DELETE",
-            });
+            const res = await api.users.me.$delete();
 
             if (res.ok) {
                 // 削除成功したらトップページなどへ強制リダイレクト
