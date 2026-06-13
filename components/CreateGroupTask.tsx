@@ -5,6 +5,7 @@ import {
   Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, 
   useDisclosure, Button, Input, Textarea, Select, SelectItem, Avatar 
 } from "@heroui/react";
+import { api } from "@/lib/hono";
 
 interface Member {
     id: string;
@@ -30,17 +31,15 @@ export function CreateGroupTask({ teamId, groupId, members, onTaskCreated }: Cre
   const handleCreate = async (onClose: () => void) => {
     setIsLoading(true);
     try {
-      const res = await fetch("/api/tasks", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const res = await api.tasks.$post({
+        json: {
           title,
           description,
           dueDate: dueDate || undefined,
           assigneeId: assigneeId || undefined,
           teamId,
           taskGroupId: groupId,
-        }),
+        },
       });
 
       if (res.ok) {
@@ -104,7 +103,7 @@ export function CreateGroupTask({ teamId, groupId, members, onTaskCreated }: Cre
                         {members.map((member) => (
                             <SelectItem key={member.id} textValue={member.name}>
                                 <div className="flex items-center gap-2">
-                                    <Avatar alt={member.name} className="flex-shrink-0" size="sm" src={member.image || undefined} />
+                                  <Avatar alt={member.name} className="shrink-0" size="sm" src={member.image || undefined} />
                                     <span className="text-small">{member.name}</span>
                                 </div>
                             </SelectItem>

@@ -196,7 +196,7 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
                     ) : (
                         <div className="flex overflow-x-auto pb-4 gap-4">
                             {activeUnassignedTasks.map((task) => (
-                                <div key={task.id} className="flex-shrink-0">
+                                <div key={task.id} className="shrink-0">
                                     <TaskCard
                                         id={task.id}
                                         title={task.title}
@@ -226,7 +226,7 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
                             <div key={member.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                                 <div className="flex flex-col md:flex-row gap-6">
                                     {/* 左側: メンバー情報 */}
-                                    <div className="w-full md:w-48 flex-shrink-0 flex flex-col items-center md:items-start border-b md:border-b-0 md:border-r border-gray-100 pb-4 md:pb-0 md:pr-4">
+                                            <div className="w-full md:w-48 shrink-0 flex flex-col items-center md:items-start border-b md:border-b-0 md:border-r border-gray-100 pb-4 md:pb-0 md:pr-4">
                                         <Avatar 
                                             src={member.image || undefined} 
                                             name={member.name} 
@@ -245,13 +245,13 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
                                     {/* 右側: タスク一覧 */}
                                     <div className="flex-1 overflow-x-auto">
                                         {memberTasks.length === 0 ? (
-                                            <div className="h-full flex items-center justify-center text-gray-400 text-sm min-h-[100px]">
+                                            <div className="h-full flex items-center justify-center text-gray-400 text-sm min-h-25">
                                                 現在担当しているタスクはありません
                                             </div>
                                         ) : (
                                             <div className="flex gap-4 pb-2">
                                                 {memberTasks.map((task) => (
-                                                    <div key={task.id} className="flex-shrink-0">
+                                                    <div key={task.id} className="shrink-0">
                                                         <TaskCard
                                                             id={task.id}
                                                             title={task.title}
@@ -299,8 +299,8 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
                                 <div className="mb-8 opacity-75">
                                     <h3 className="text-md font-bold text-gray-500 mb-3 ml-2">未割り当て (完了)</h3>
                                     <div className="flex overflow-x-auto pb-4 gap-4">
-                                        {completedUnassignedTasks.map((task) => (
-                                            <div key={task.id} className="flex-shrink-0 transform scale-95 origin-top-left">
+                                                {completedUnassignedTasks.map((task) => (
+                                                    <div key={task.id} className="shrink-0 transform scale-95 origin-top-left">
                                                 <TaskCard
                                                     id={task.id}
                                                     title={task.title}
@@ -333,8 +333,8 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
                                         </div>
                                         
                                         <div className="flex overflow-x-auto pb-4 gap-4 pl-4 border-l-4 border-gray-200">
-                                            {memberCompletedTasks.map((task) => (
-                                                <div key={task.id} className="flex-shrink-0 transform scale-95 origin-top-left">
+                                                {memberCompletedTasks.map((task) => (
+                                                    <div key={task.id} className="shrink-0 transform scale-95 origin-top-left">
                                                     <TaskCard
                                                         id={task.id}
                                                         title={task.title}

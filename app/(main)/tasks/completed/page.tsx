@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import TaskCard from "@/components/TaskCard";
 import { Divider, Button } from "@heroui/react";
 import { useRouter } from "next/navigation";
+import { api } from "@/lib/hono";
 
 interface Task {
     id: string;
@@ -24,7 +25,7 @@ export default function CompletedTasksPage() {
 
     const fetchTasks = useCallback(async () => {
         try {
-            const res = await fetch("/api/tasks");
+            const res = await api.tasks.$get();
             if (res.ok) {
                 const data: Task[] = await res.json();
                 

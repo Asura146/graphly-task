@@ -6,6 +6,7 @@ import {
   useDisclosure, Button, Input, Textarea, Select, SelectItem, Avatar
 } from "@heroui/react";
 import { useRouter } from "next/navigation";
+import { api } from "@/lib/hono";
 
 interface Member {
     id: string;
@@ -33,17 +34,14 @@ export function CreateTeamTask({ teamId, members, onTaskCreated }: CreateTeamTas
     if (!title) return;
     setIsLoading(true);
     try {
-      const res = await fetch("/api/tasks", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const res = await api.tasks.$post({
+        json: {
           title,
           description,
           dueDate: dueDate || undefined,
           teamId,
-          // 空文字の場合はnull（未割り当て）として送信
           assigneeId: assigneeId || null, 
-        }),
+        },
       });
 
       if (res.ok) {
@@ -94,7 +92,7 @@ export function CreateTeamTask({ teamId, members, onTaskCreated }: CreateTeamTas
                             {members.map((member) => (
                                 <SelectItem key={member.id} textValue={member.name}>
                                     <div className="flex items-center gap-2">
-                                        <Avatar alt={member.name} className="flex-shrink-0" size="sm" src={member.image || undefined} />
+                                        <Avatar alt={member.name} className="shrink-0" size="sm" src={member.image || undefined} />
                                         <span className="text-small">{member.name}</span>
                                     </div>
                                 </SelectItem>

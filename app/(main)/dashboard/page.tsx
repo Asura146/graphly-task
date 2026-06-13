@@ -41,7 +41,7 @@ export default function DashboardPage() {
     // データ取得関数を定義
     const fetchTasks = useCallback(async () => {
         try {
-            const res = await fetch("/api/tasks");
+            const res = await api.tasks.$get();
             if (res.ok) {
                 const data: Task[] = await res.json();
 
@@ -67,7 +67,7 @@ export default function DashboardPage() {
     // ★追加: 個人フロー取得
     const fetchPersonalGroups = useCallback(async () => {
         try {
-            const res = await fetch("/api/task-groups");
+            const res = await api["task-groups"].$get();
             if (res.ok) {
                 setPersonalGroups(await res.json());
             }
@@ -177,7 +177,7 @@ export default function DashboardPage() {
                 ) : (
                     <div className="flex overflow-x-auto grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 place-items-center">
                         {tasks.map((task) => (
-                            <div key={task.id} className="flex-shrink-0 my-4">
+                            <div key={task.id} className="shrink-0 my-4">
                                 <TaskCard
                                     id={task.id}
                                     title={task.title}

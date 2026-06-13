@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 import { db } from "@/lib/db";
-// 修正: taskGroups をインポートに追加
 import { teams, teamMembers, user as users, tasks, taskGroups } from "@/db/schema"
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
@@ -19,6 +18,7 @@ const inviteMemberSchema = z.object({
 });
 
 export const teamRoute = new Hono<Env>()
+    //チーム作成API
     .post("/",zValidator("json",createTeamSchema),async(c)=>{
         const user = c.get("user");
         if(!user) return c.json({ error: "Unauthorized" }, 401);
@@ -49,6 +49,40 @@ export const teamRoute = new Hono<Env>()
             return c.json({ error: "Failed to create team" }, 500);
         }
     })
+
+    // メンバーかどうかのチェック処理用ミドルウェア
+    .use("/:id/*", async (c, next) => {
+        const user = c.get("user");
+        if (!user) return c.json({ error: "Unauthorized" }, 401);
+
+        const teamId = c.req.param("id");
+
+        if (!teamId) {
+            return c.json({ error: "Team ID is required" }, 400);
+        }
+
+        try {
+            const [member] = await db
+                .select()
+                .from(teamMembers)
+                .where(and(
+                    eq(teamMembers.teamId, teamId),
+                    eq(teamMembers.userId, user.id)
+                ))
+                .limit(1);
+
+            if (!member) {
+                return c.json({ error: "Team not found or Access denied" }, 404);
+            }
+
+            await next(); // メンバーなら通過して、下の各APIへ進む
+        } catch (error) {
+            console.error("Middleware verification error:", error);
+            return c.json({ error: "Internal Server Error" }, 500);
+        }
+    })
+
+
     // メンバー追加API (メールアドレスで招待)
     .post("/:id/members", zValidator("json", inviteMemberSchema), async (c) => {
       const user = c.get("user");
@@ -87,22 +121,9 @@ export const teamRoute = new Hono<Env>()
             .where(eq(users.email, email))
             .limit(1);
 
-          // 存在しなければプレースホルダユーザーを作成
+          // 存在しなければ、404を返す
           if (!targetUser) {
-            const newUserId = `user_${nanoid()}`;
-            const now = new Date();
-            const [created] = await tx.insert(users).values({
-              id: newUserId,
-              name: email.split("@")[0],
-              email,
-              emailVerified: false,
-              image: null,
-              createdAt: now,
-              updatedAt: now,
-              role: null,
-              banned: false,
-            }).returning();
-            targetUser = created;
+            return { status: 403, body: { error: "ユーザが存在しません" } };
           }
 
           // 既にメンバーになっていないか確認
@@ -141,6 +162,7 @@ export const teamRoute = new Hono<Env>()
         return c.json({ error: "Failed to add member" }, 500);
       }
     })
+    //所属チーム一覧を取得するAPI
     .get("/", async (c) => {
         const user = c.get("user");
         if (!user) return c.json({ error: "Unauthorized" }, 401);
@@ -152,7 +174,7 @@ export const teamRoute = new Hono<Env>()
               id: teams.id,
               name: teams.name,
               description: teams.description,
-              role: teamMembers.role, // 自分の役割（ADMIN/MEMBER）も一緒に返すと便利
+              role: teamMembers.role,
               createdAt: teams.createdAt,
             })
             .from(teams)
@@ -168,7 +190,6 @@ export const teamRoute = new Hono<Env>()
       })
       .get("/:id", async (c) => {
         const teamId = c.req.param("id");
-        // 修正: ここも db.select().from(teams) へ変更
         const [team] = await db
             .select()
             .from(teams)
@@ -179,7 +200,7 @@ export const teamRoute = new Hono<Env>()
         return c.json(team);
       })
     
-      // 2. そのチームの全タスクを取得 (GET /api/teams/:id/tasks)
+      // そのチームの全タスクを取得 (GET /api/teams/:id/tasks)
       .get("/:id/tasks", async (c) => {
         const teamId = c.req.param("id");
         
@@ -193,14 +214,11 @@ export const teamRoute = new Hono<Env>()
             createdAt: tasks.createdAt,
             assigneeId: tasks.assigneeId, 
             assigneeName: users.name, 
-            
-            // ★追加: グループ情報を取得
             groupId: tasks.taskGroupId,
             groupTitle: taskGroups.title,
           })
           .from(tasks)
           .leftJoin(users, eq(tasks.assigneeId, users.id)) 
-          // ★追加: taskGroups と JOIN
           .leftJoin(taskGroups, eq(tasks.taskGroupId, taskGroups.id))
           .where(eq(tasks.teamId, teamId))
           .orderBy(desc(tasks.createdAt));
@@ -208,7 +226,7 @@ export const teamRoute = new Hono<Env>()
         return c.json(teamTasks);
       })
     
-      // 3. チームメンバー一覧の取得 (GET /api/teams/:id/members)
+      // チームメンバー一覧の取得 (GET /api/teams/:id/members)
       .get("/:id/members", async (c) => {
         const teamId = c.req.param("id");
         const members = await db
@@ -224,7 +242,7 @@ export const teamRoute = new Hono<Env>()
           .where(eq(teamMembers.teamId, teamId));
         return c.json(members);
       })
-      // ★追加: チーム内のタスクグループ一覧取得
+      // チーム内のタスクグループ一覧取得
       .get("/:id/task-groups", async (c) => {
         const teamId = c.req.param("id");
         const groups = await db

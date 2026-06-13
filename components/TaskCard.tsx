@@ -22,6 +22,7 @@ import { Button } from "@heroui/button";
 import { Select, SelectItem, Avatar } from "@heroui/react";
 import Link from "next/link";
 import confetti from "canvas-confetti";
+import { api } from "@/lib/hono";
 
 type TaskStatus = "todo" | "in_progress" | "done";
 
@@ -121,7 +122,7 @@ export default function TaskCard({
         if (!id) return;
         setIsLoading(true);
         try {
-            const res = await fetch(`/api/tasks/${id}`, { method: "DELETE" });
+            const res = await api.tasks[":id"].$delete({ param: { id } });
             if (!res.ok) throw new Error("Delete failed");
             
             if (typeof window !== "undefined") {
@@ -153,15 +154,14 @@ export default function TaskCard({
         if (!id) return;
         setIsLoading(true);
         try {
-            const res = await fetch(`/api/tasks/${id}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
+            const res = await api.tasks[":id"].$patch({
+                param: { id },
+                json: {
                     title: editTitle,
                     description: editDescription,
                     dueDate: editDueDate || undefined,
                     assigneeId: editAssigneeId || null,
-                }),
+                },
             });
 
             if (!res.ok) throw new Error("Update failed");
@@ -179,14 +179,13 @@ export default function TaskCard({
         }
     };
 
-    const updateTaskStatus = async (serverStatusKey: string) => {
+    const updateTaskStatus = async (serverStatusKey: "TODO" | "IN_PROGRESS" | "DONE") => {
         try {
-            const res = await fetch(`/api/tasks/${id}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
+            const res = await api.tasks[":id"].$patch({
+                param: { id: id! },
+                json: {
                     status: serverStatusKey,
-                }),
+                },
             });
 
             if (!res.ok) throw new Error("Status update failed");
@@ -209,7 +208,7 @@ export default function TaskCard({
             return; 
         }
 
-        const serverStatusMap: Record<string, string> = {
+        const serverStatusMap: Record<TaskStatus, "TODO" | "IN_PROGRESS" | "DONE"> = {
             todo: "TODO",
             in_progress: "IN_PROGRESS",
             done: "DONE",
@@ -271,7 +270,7 @@ export default function TaskCard({
                                 {groupId && groupName && (
                                     <Link 
                                         href={`/groups/${groupId}`} 
-                                        className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded border border-blue-100 hover:bg-blue-100 transition-colors ml-2 truncate max-w-[100px]"
+                                        className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded border border-blue-100 hover:bg-blue-100 transition-colors ml-2 truncate max-w-25"
                                         onClick={(e) => e.stopPropagation()}
                                     >
                                         <p className="px-1 truncate">{groupName}</p>
@@ -357,7 +356,7 @@ export default function TaskCard({
                                             {members.map((member) => (
                                                 <SelectItem key={member.id} textValue={member.name}>
                                                     <div className="flex items-center gap-2">
-                                                        <Avatar alt={member.name} className="flex-shrink-0" size="sm" src={member.image || undefined} />
+                                                        <Avatar alt={member.name} className="shrink-0" size="sm" src={member.image || undefined} />
                                                         <span className="text-small">{member.name}</span>
                                                     </div>
                                                 </SelectItem>
