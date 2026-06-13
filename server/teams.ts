@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 import { db } from "@/lib/db";
-// 修正: taskGroups をインポートに追加
 import { teams, teamMembers, user as users, tasks, taskGroups } from "@/db/schema"
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
@@ -19,6 +18,7 @@ const inviteMemberSchema = z.object({
 });
 
 export const teamRoute = new Hono<Env>()
+    //チーム作成API
     .post("/",zValidator("json",createTeamSchema),async(c)=>{
         const user = c.get("user");
         if(!user) return c.json({ error: "Unauthorized" }, 401);
@@ -141,6 +141,7 @@ export const teamRoute = new Hono<Env>()
         return c.json({ error: "Failed to add member" }, 500);
       }
     })
+    //所属チーム一覧を取得するAPI
     .get("/", async (c) => {
         const user = c.get("user");
         if (!user) return c.json({ error: "Unauthorized" }, 401);
@@ -152,7 +153,7 @@ export const teamRoute = new Hono<Env>()
               id: teams.id,
               name: teams.name,
               description: teams.description,
-              role: teamMembers.role, // 自分の役割（ADMIN/MEMBER）も一緒に返すと便利
+              role: teamMembers.role,
               createdAt: teams.createdAt,
             })
             .from(teams)
@@ -168,7 +169,6 @@ export const teamRoute = new Hono<Env>()
       })
       .get("/:id", async (c) => {
         const teamId = c.req.param("id");
-        // 修正: ここも db.select().from(teams) へ変更
         const [team] = await db
             .select()
             .from(teams)
@@ -179,7 +179,7 @@ export const teamRoute = new Hono<Env>()
         return c.json(team);
       })
     
-      // 2. そのチームの全タスクを取得 (GET /api/teams/:id/tasks)
+      // そのチームの全タスクを取得 (GET /api/teams/:id/tasks)
       .get("/:id/tasks", async (c) => {
         const teamId = c.req.param("id");
         
@@ -208,7 +208,7 @@ export const teamRoute = new Hono<Env>()
         return c.json(teamTasks);
       })
     
-      // 3. チームメンバー一覧の取得 (GET /api/teams/:id/members)
+      // チームメンバー一覧の取得 (GET /api/teams/:id/members)
       .get("/:id/members", async (c) => {
         const teamId = c.req.param("id");
         const members = await db
@@ -224,7 +224,7 @@ export const teamRoute = new Hono<Env>()
           .where(eq(teamMembers.teamId, teamId));
         return c.json(members);
       })
-      // ★追加: チーム内のタスクグループ一覧取得
+      // チーム内のタスクグループ一覧取得
       .get("/:id/task-groups", async (c) => {
         const teamId = c.req.param("id");
         const groups = await db
