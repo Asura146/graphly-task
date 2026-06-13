@@ -12,6 +12,7 @@ import {
   useDisclosure,
 } from "@heroui/modal";
 import { Input, Textarea } from "@heroui/input";
+import { api } from "@/lib/hono";
 
 export default function CreateMyTask() {
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
@@ -28,19 +29,12 @@ export default function CreateMyTask() {
 
     setIsLoading(true);
     try {
-        // API エンドポイントに合わせてリクエストを作成
-        // server/tasks.ts の POST / ルートに対応
-        const res = await fetch("/api/tasks", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-                title,
-                description,
-                dueDate: dueDate || undefined,
-                // teamId を送らないことで個人タスクとして扱われる
-            }),
+      const res = await api.tasks.$post({
+        json: {
+          title,
+          description,
+          dueDate: dueDate || undefined,
+        },
         });
 
         if (!res.ok) {

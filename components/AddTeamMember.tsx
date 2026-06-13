@@ -7,6 +7,7 @@ import {
 } from "@heroui/react";
 import { useRouter } from "next/navigation";
 import { UserPlus } from "lucide-react"; // 💡 アイコンをインポート
+import { api } from "@/lib/hono";
 
 interface AddTeamMemberProps {
     teamId: string;
@@ -23,10 +24,9 @@ export function AddTeamMember({ teamId, teamName, onSuccess }: AddTeamMemberProp
   const handleAddMember = async (onClose: () => void) => {
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/teams/${teamId}/members`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+      const res = await api.teams[":id"].members.$post({
+        param: { id: teamId },
+        json: { email },
       });
 
       if (res.ok) {
@@ -36,7 +36,7 @@ export function AddTeamMember({ teamId, teamName, onSuccess }: AddTeamMemberProp
         onClose();
         setEmail("");
       } else {
-        const error = await res.json();
+        const error = await res.json() as { error?: string };
         alert(error.error || "メンバー追加に失敗しました");
       }
     } catch (error) {

@@ -6,6 +6,7 @@ import {
   useDisclosure, Button, Input, Textarea 
 } from "@heroui/react";
 import { useRouter } from "next/navigation";
+import { api } from "@/lib/hono";
 
 interface CreateTaskGroupProps {
     teamId?: string | null;
@@ -22,10 +23,8 @@ export function CreateTaskGroup({ teamId, onGroupCreated }: CreateTaskGroupProps
   const handleCreate = async (onClose: () => void) => {
     setIsLoading(true);
     try {
-      const res = await fetch("/api/task-groups", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, description, teamId }),
+      const res = await api["task-groups"].$post({
+        json: { title, description, teamId: teamId ?? undefined },
       });
 
       if (res.ok) {

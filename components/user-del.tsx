@@ -2,6 +2,7 @@
 
 import { authClient } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
+import { api } from "@/lib/hono";
 
 export function DeleteAccountButton() {
     const router = useRouter();
@@ -12,10 +13,7 @@ export function DeleteAccountButton() {
         const confirmed = confirm("本当に退会しますか？");
         if (!confirmed) return;
     
-        // 直接 Hono のエンドポイントを叩く
-        const res = await fetch("/api/auth/delete-account", {
-            method: "POST",
-        });
+        const res = await api.auth["delete-account"].$post();
     
         if (res.ok) {
             alert("退会が完了しました");

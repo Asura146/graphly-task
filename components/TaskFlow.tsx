@@ -22,6 +22,7 @@ import '@xyflow/react/dist/style.css';
 import { Button, addToast } from '@heroui/react';
 import TaskCard, { Member } from './TaskCard';
 import { CreateGroupTask } from './CreateGroupTask';
+import { api } from "@/lib/hono";
 
 interface TaskFlowProps {
     groupId: string;
@@ -171,10 +172,9 @@ export default function TaskFlow({ groupId, teamId, initialTasks, initialEdges, 
         };
 
         try {
-            const res = await fetch(`/api/task-groups/${groupId}/save`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body)
+            const res = await api["task-groups"][":id"].save.$post({
+                param: { id: groupId },
+                json: body
             });
             
             if (res.ok) {
