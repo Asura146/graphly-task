@@ -10,10 +10,26 @@ services:
             - /app/node_modules
         environment:
             DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+            NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+            CRON_SECRET: ${CRON_SECRET}
         depends_on:
             db:
                 condition: service_healthy
         
+    # 10分おきに定期通知エンドポイントを叩く
+    scheduler:
+        image: alpine:3.20
+        environment:
+            CRON_SECRET: ${CRON_SECRET}
+        command:
+            - sh
+            - -c
+            - |
+              echo "*/10 * * * * wget -q -T 60 -O - --header 'Authorization: Bearer $${CRON_SECRET}' --post-data '' http://app:3000/api/cron/discord > /proc/1/fd/1 2>&1; echo > /proc/1/fd/1" > /etc/crontabs/root
+              exec crond -f -l 2
+        depends_on:
+            - app
+
     db:
         image: postgres:16-alpine
         environment:
