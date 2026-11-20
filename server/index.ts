@@ -5,6 +5,7 @@ import { taskRoute } from "./tasks";
 import { teamRoute } from "./teams";
 import { taskGroupRoute } from "./taskGroups"; // 追加
 import { userRoute } from "./users"; // インポートを追加
+import { cronRoute } from "./cron";
 
 export type Env = {
     Variables: {
@@ -36,7 +37,8 @@ const routes = app
 .route("/teams", teamRoute)
 .route("/tasks", taskRoute)
 .route("/task-groups", taskGroupRoute) // 追加
-.route("/users", userRoute); // ★追加
+.route("/users", userRoute) // ★追加
+.route("/cron", cronRoute);
 
 export default app;
 export type AppType = typeof routes;
