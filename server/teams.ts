@@ -1,11 +1,13 @@
 import { Hono } from "hono";
 import { db } from "@/lib/db";
-import { teams, teamMembers, user as users, tasks, taskGroups } from "@/db/schema"
+import { teams, teamMembers, user as users, tasks, taskGroups, discordWebhooks } from "@/db/schema"
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { nanoid } from "nanoid"
 import { Env } from "@/server"
 import { eq, desc, and } from "drizzle-orm"
+import { discordSettingsSchema, toDiscordSettings } from "@/lib/discord"
+import { sendTestNotification } from "@/lib/notifications"
 
 const createTeamSchema = z.object({
     name: z.string().min(1,"チーム名は必須です。"),
@@ -16,6 +18,25 @@ const createTeamSchema = z.object({
 const inviteMemberSchema = z.object({
     email: z.string().email("有効なメールアドレスを入力してください"),
 });
+
+// チームの ADMIN かどうか
+async function isTeamAdmin(teamId: string, userId: string) {
+    const [member] = await db
+        .select()
+        .from(teamMembers)
+        .where(and(eq(teamMembers.teamId, teamId), eq(teamMembers.userId, userId)))
+        .limit(1);
+    return !!member && member.role === "ADMIN";
+}
+
+async function getTeamWebhook(teamId: string) {
+    const [webhook] = await db
+        .select()
+        .from(discordWebhooks)
+        .where(eq(discordWebhooks.teamId, teamId))
+        .limit(1);
+    return webhook;
+}
 
 export const teamRoute = new Hono<Env>()
     //チーム作成API
@@ -251,4 +272,111 @@ export const teamRoute = new Hono<Env>()
             .where(eq(taskGroups.teamId, teamId))
             .orderBy(desc(taskGroups.createdAt));
         return c.json(groups);
+      })
+
+      // Discord 通知設定の取得 (メンバーは設定の有無のみ)
+      .get("/:id/discord", async (c) => {
+        const user = c.get("user");
+        if (!user) return c.json({ error: "Unauthorized" }, 401);
+        const teamId = c.req.param("id");
+
+        try {
+          const canEdit = await isTeamAdmin(teamId, user.id);
+          const webhook = await getTeamWebhook(teamId);
+          return c.json({
+            configured: !!webhook,
+            canEdit,
+            settings: webhook && canEdit ? toDiscordSettings(webhook) : null,
+          }, 200);
+        } catch (error) {
+          console.error(error);
+          return c.json({ error: "Failed to fetch Discord settings" }, 500);
+        }
+      })
+
+      // Discord 通知設定の登録・更新 (ADMIN のみ)
+      .put("/:id/discord", zValidator("json", discordSettingsSchema), async (c) => {
+        const user = c.get("user");
+        if (!user) return c.json({ error: "Unauthorized" }, 401);
+        const teamId = c.req.param("id");
+        const { webhookUrl, ...settings } = c.req.valid("json");
+
+        try {
+          if (!(await isTeamAdmin(teamId, user.id))) {
+            return c.json({ error: "Forbidden" }, 403);
+          }
+
+          const existing = await getTeamWebhook(teamId);
+          if (existing) {
+            const [updated] = await db
+              .update(discordWebhooks)
+              .set({
+                ...settings,
+                ...(webhookUrl ? { webhookUrl } : {}),
+                updatedAt: new Date(),
+              })
+              .where(eq(discordWebhooks.id, existing.id))
+              .returning();
+            return c.json({ configured: true, canEdit: true, settings: toDiscordSettings(updated) }, 200);
+          }
+
+          if (!webhookUrl) {
+            return c.json({ error: "Webhook URL は必須です" }, 400);
+          }
+          const [created] = await db
+            .insert(discordWebhooks)
+            .values({ id: `dwh_${nanoid()}`, teamId, webhookUrl, ...settings })
+            .returning();
+          return c.json({ configured: true, canEdit: true, settings: toDiscordSettings(created) }, 200);
+        } catch (error) {
+          console.error(error);
+          return c.json({ error: "Failed to save Discord settings" }, 500);
+        }
+      })
+
+      // Discord 連携解除 (ADMIN のみ)
+      .delete("/:id/discord", async (c) => {
+        const user = c.get("user");
+        if (!user) return c.json({ error: "Unauthorized" }, 401);
+        const teamId = c.req.param("id");
+
+        try {
+          if (!(await isTeamAdmin(teamId, user.id))) {
+            return c.json({ error: "Forbidden" }, 403);
+          }
+          await db.delete(discordWebhooks).where(eq(discordWebhooks.teamId, teamId));
+          return c.json({ success: true }, 200);
+        } catch (error) {
+          console.error(error);
+          return c.json({ error: "Failed to delete Discord settings" }, 500);
+        }
+      })
+
+      // Discord テスト送信 (ADMIN のみ)
+      .post("/:id/discord/test", async (c) => {
+        const user = c.get("user");
+        if (!user) return c.json({ error: "Unauthorized" }, 401);
+        const teamId = c.req.param("id");
+
+        try {
+          if (!(await isTeamAdmin(teamId, user.id))) {
+            return c.json({ error: "Forbidden" }, 403);
+          }
+          const webhook = await getTeamWebhook(teamId);
+          if (!webhook) return c.json({ error: "Discord 通知が設定されていません" }, 404);
+
+          const result = await sendTestNotification(webhook);
+          if (!result.ok) {
+            console.error(`[discord] test send failed (status ${result.status}): ${result.message}`);
+            return c.json({
+              error: result.invalidWebhook
+                ? "Webhook が見つかりません。URL を確認してください"
+                : "Discord への送信に失敗しました",
+            }, 502);
+          }
+          return c.json({ success: true }, 200);
+        } catch (error) {
+          console.error(error);
+          return c.json({ error: "Failed to send test notification" }, 500);
+        }
       });
