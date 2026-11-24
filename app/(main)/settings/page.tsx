@@ -6,6 +6,7 @@ import { Button } from "@heroui/button";
 import { Input } from "@heroui/input";
 import { Divider } from "@heroui/react";
 import { api } from "@/lib/hono";
+import { DiscordSettingsForm } from "@/components/DiscordSettingsForm";
 import {
     Modal,
     ModalContent,
@@ -114,6 +115,15 @@ export default function SettingsPage() {
                             </Button>
                         </div>
                     </div>
+                </div>
+
+                {/* Discord通知設定セクション */}
+                <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200 mb-8">
+                    <h2 className="text-lg font-bold text-gray-700 mb-1">Discord通知</h2>
+                    <p className="text-sm text-gray-500 mb-6">
+                        あなたが担当している未完了タスクを、毎日決まった時刻に Discord に通知します。
+                    </p>
+                    <DiscordSettingsForm scope={{ type: "user" }} />
                 </div>
 
                 {/* 危険なエリア */}

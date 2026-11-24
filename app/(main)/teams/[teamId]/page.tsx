@@ -8,6 +8,7 @@ import { Divider } from "@heroui/react";
 import Link from "next/link";
 import TaskCard from "@/components/TaskCard";
 import { AddTeamMember } from "@/components/AddTeamMember";
+import { TeamDiscordSettings } from "@/components/TeamDiscordSettings";
 import { api } from "@/lib/hono";
 import { CreateTaskGroup } from "@/components/CreateTaskGroup";
 import { CreateTeamTask } from "./components/CreateTeamTask";
@@ -131,6 +132,7 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
                             <div className="flex items-center gap-3">
                                 <h1 className="text-3xl font-bold text-gray-800">{team.name}</h1>
                                 <AddTeamMember teamId={teamId} teamName={team.name} onSuccess={fetchData} />
+                                <TeamDiscordSettings teamId={teamId} teamName={team.name} />
                             </div>
                             
                             <p className="text-gray-500 mt-2">{team.description}</p>
