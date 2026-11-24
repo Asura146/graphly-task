@@ -8,8 +8,9 @@ import {
   doublePrecision,
   primaryKey,
   unique,
+  check,
 } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 
 // 1. ユーザーテーブル
 export const user = pgTable("user", {
@@ -148,6 +149,34 @@ export const taskDependencies = pgTable("task_dependencies", {
   unique().on(t.predecessorId, t.successorId),
 ]);
 
+// 10. Discord Webhooks Table (チーム or 個人の通知設定) ---
+export const discordWebhooks = pgTable("discord_webhooks", {
+  id: varchar("id", { length: 255 }).primaryKey(),
+  // teamId と userId はどちらか一方だけが入る
+  teamId: varchar("team_id", { length: 255 })
+    .unique()
+    .references(() => teams.id, { onDelete: "cascade" }),
+  userId: text("user_id")
+    .unique()
+    .references(() => user.id, { onDelete: "cascade" }),
+
+  webhookUrl: text("webhook_url").notNull(),
+  enabled: boolean("enabled").default(true).notNull(),
+  notifyHour: integer("notify_hour").default(9).notNull(), // 0-23 (JST)
+  dueReminderEnabled: boolean("due_reminder_enabled").default(true).notNull(),
+  dueReminderDaysBefore: integer("due_reminder_days_before").default(1).notNull(), // 0-7
+  dailyDigestEnabled: boolean("daily_digest_enabled").default(true).notNull(),
+  lastNotifiedDate: text("last_notified_date"), // YYYY-MM-DD (JST)
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => [
+  check(
+    "discord_webhooks_owner_check",
+    sql`(${t.teamId} IS NULL) <> (${t.userId} IS NULL)`
+  ),
+]);
+
 // --- Relations (Drizzle Relation API) ---
 // クエリを書きやすくするためのリレーション定義
 
@@ -174,4 +203,9 @@ export const taskDependencyRelations = relations(taskDependencies, ({ one }) => 
     references: [tasks.id],
     relationName: "successor",
   }),
+}));
+
+export const discordWebhookRelations = relations(discordWebhooks, ({ one }) => ({
+  team: one(teams, { fields: [discordWebhooks.teamId], references: [teams.id] }),
+  user: one(user, { fields: [discordWebhooks.userId], references: [user.id] }),
 }));
