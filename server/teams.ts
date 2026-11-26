@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { db } from "@/lib/db";
-import { teams, teamMembers, user as users, tasks, taskGroups, discordWebhooks } from "@/db/schema"
+import { teams, teamMembers, user as users, tasks, taskGroups, discordWebhooks, teamLinks } from "@/db/schema"
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { nanoid } from "nanoid"
@@ -17,6 +17,18 @@ const createTeamSchema = z.object({
 // メンバー招待用スキーマ
 const inviteMemberSchema = z.object({
     email: z.string().email("有効なメールアドレスを入力してください"),
+});
+
+// リンク集用スキーマ (javascript: などを防ぐため http/https のみ許可)
+const linkSchema = z.object({
+    title: z.string().trim().min(1, "タイトルは必須です").max(100),
+    url: z
+        .string()
+        .trim()
+        .max(2048, "URLが長すぎます")
+        .url("有効なURLを入力してください")
+        .refine((v) => /^https?:\/\//i.test(v), "http:// または https:// のURLのみ登録できます"),
+    description: z.string().trim().max(500).optional(),
 });
 
 // チームの ADMIN かどうか
@@ -272,6 +284,122 @@ export const teamRoute = new Hono<Env>()
             .where(eq(taskGroups.teamId, teamId))
             .orderBy(desc(taskGroups.createdAt));
         return c.json(groups);
+      })
+
+      // リンク集の一覧取得
+      .get("/:id/links", async (c) => {
+        const user = c.get("user");
+        if (!user) return c.json({ error: "Unauthorized" }, 401);
+        const teamId = c.req.param("id");
+
+        try {
+          const isAdmin = await isTeamAdmin(teamId, user.id);
+          const links = await db
+            .select({
+              id: teamLinks.id,
+              title: teamLinks.title,
+              url: teamLinks.url,
+              description: teamLinks.description,
+              creatorId: teamLinks.creatorId,
+              creatorName: users.name,
+              createdAt: teamLinks.createdAt,
+            })
+            .from(teamLinks)
+            .leftJoin(users, eq(teamLinks.creatorId, users.id))
+            .where(eq(teamLinks.teamId, teamId))
+            .orderBy(desc(teamLinks.createdAt));
+
+          return c.json(
+            links.map((link) => ({ ...link, canEdit: isAdmin || link.creatorId === user.id })),
+            200
+          );
+        } catch (error) {
+          console.error(error);
+          return c.json({ error: "Failed to fetch links" }, 500);
+        }
+      })
+
+      // リンクの追加 (メンバー全員)
+      .post("/:id/links", zValidator("json", linkSchema), async (c) => {
+        const user = c.get("user");
+        if (!user) return c.json({ error: "Unauthorized" }, 401);
+        const teamId = c.req.param("id");
+        const { title, url, description } = c.req.valid("json");
+
+        try {
+          const [created] = await db
+            .insert(teamLinks)
+            .values({
+              id: `link_${nanoid()}`,
+              teamId,
+              creatorId: user.id,
+              title,
+              url,
+              description: description || null,
+            })
+            .returning();
+          return c.json(created, 201);
+        } catch (error) {
+          console.error(error);
+          return c.json({ error: "Failed to create link" }, 500);
+        }
+      })
+
+      // リンクの更新 (作成者 or ADMIN)
+      .put("/:id/links/:linkId", zValidator("json", linkSchema), async (c) => {
+        const user = c.get("user");
+        if (!user) return c.json({ error: "Unauthorized" }, 401);
+        const teamId = c.req.param("id");
+        const linkId = c.req.param("linkId");
+        const { title, url, description } = c.req.valid("json");
+
+        try {
+          const [link] = await db
+            .select()
+            .from(teamLinks)
+            .where(and(eq(teamLinks.id, linkId), eq(teamLinks.teamId, teamId)))
+            .limit(1);
+          if (!link) return c.json({ error: "Link not found" }, 404);
+          if (link.creatorId !== user.id && !(await isTeamAdmin(teamId, user.id))) {
+            return c.json({ error: "Forbidden" }, 403);
+          }
+
+          const [updated] = await db
+            .update(teamLinks)
+            .set({ title, url, description: description || null, updatedAt: new Date() })
+            .where(eq(teamLinks.id, linkId))
+            .returning();
+          return c.json(updated, 200);
+        } catch (error) {
+          console.error(error);
+          return c.json({ error: "Failed to update link" }, 500);
+        }
+      })
+
+      // リンクの削除 (作成者 or ADMIN)
+      .delete("/:id/links/:linkId", async (c) => {
+        const user = c.get("user");
+        if (!user) return c.json({ error: "Unauthorized" }, 401);
+        const teamId = c.req.param("id");
+        const linkId = c.req.param("linkId");
+
+        try {
+          const [link] = await db
+            .select()
+            .from(teamLinks)
+            .where(and(eq(teamLinks.id, linkId), eq(teamLinks.teamId, teamId)))
+            .limit(1);
+          if (!link) return c.json({ error: "Link not found" }, 404);
+          if (link.creatorId !== user.id && !(await isTeamAdmin(teamId, user.id))) {
+            return c.json({ error: "Forbidden" }, 403);
+          }
+
+          await db.delete(teamLinks).where(eq(teamLinks.id, linkId));
+          return c.json({ success: true }, 200);
+        } catch (error) {
+          console.error(error);
+          return c.json({ error: "Failed to delete link" }, 500);
+        }
       })
 
       // Discord 通知設定の取得 (メンバーは設定の有無のみ)

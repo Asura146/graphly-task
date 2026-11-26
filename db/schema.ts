@@ -177,6 +177,23 @@ export const discordWebhooks = pgTable("discord_webhooks", {
   ),
 ]);
 
+// 11. Team Links Table (チームのリンク集) ---
+export const teamLinks = pgTable("team_links", {
+  id: varchar("id", { length: 255 }).primaryKey(),
+  teamId: varchar("team_id", { length: 255 })
+    .notNull()
+    .references(() => teams.id, { onDelete: "cascade" }),
+  creatorId: text("creator_id")
+    .references(() => user.id, { onDelete: "set null" }),
+
+  title: text("title").notNull(),
+  url: text("url").notNull(),
+  description: text("description"),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // --- Relations (Drizzle Relation API) ---
 // クエリを書きやすくするためのリレーション定義
 
@@ -205,7 +222,12 @@ export const taskDependencyRelations = relations(taskDependencies, ({ one }) => 
   }),
 }));
 
-export const discordWebhookRelations = relations(discordWebhooks, ({ one }) => ({
+export const teamLinkRelations = relations(teamLinks, ({ one }) => ({
+  team: one(teams, { fields: [teamLinks.teamId], references: [teams.id] }),
+  creator: one(user, { fields: [teamLinks.creatorId], references: [user.id] }),
+}));
+
+export const discordWebhookRelations =relations(discordWebhooks, ({ one }) => ({
   team: one(teams, { fields: [discordWebhooks.teamId], references: [teams.id] }),
   user: one(user, { fields: [discordWebhooks.userId], references: [user.id] }),
 }));
