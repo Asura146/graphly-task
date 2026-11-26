@@ -9,6 +9,7 @@ import Link from "next/link";
 import TaskCard from "@/components/TaskCard";
 import { AddTeamMember } from "@/components/AddTeamMember";
 import { TeamDiscordSettings } from "@/components/TeamDiscordSettings";
+import { TeamLinks } from "@/components/TeamLinks";
 import { api } from "@/lib/hono";
 import { CreateTaskGroup } from "@/components/CreateTaskGroup";
 import { CreateTeamTask } from "./components/CreateTeamTask";
@@ -177,6 +178,9 @@ export default function TeamPage({ params }: { params: Promise<{ teamId: string 
                         </div>
                     )}
                 </div>
+
+                {/* チームのリンク集 */}
+                <TeamLinks teamId={teamId} />
 
                 <Divider className="my-8" />
 
