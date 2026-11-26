@@ -6,6 +6,9 @@ import { api } from "@/lib/hono";
 
 type DiscordScope = { type: "team"; teamId: string } | { type: "user" };
 
+type MentionType = "none" | "everyone" | "here";
+type MentionCondition = "always" | "urgent";
+
 type DiscordSettings = {
     webhookUrlMasked: string;
     enabled: boolean;
@@ -13,6 +16,8 @@ type DiscordSettings = {
     dueReminderEnabled: boolean;
     dueReminderDaysBefore: number;
     dailyDigestEnabled: boolean;
+    mentionType: MentionType;
+    mentionCondition: MentionCondition;
 };
 
 type DiscordSettingsResponse = {
@@ -28,6 +33,8 @@ type SettingsInput = {
     dueReminderEnabled: boolean;
     dueReminderDaysBefore: number;
     dailyDigestEnabled: boolean;
+    mentionType: MentionType;
+    mentionCondition: MentionCondition;
 };
 
 const HOUR_OPTIONS = Array.from({ length: 24 }, (_, h) => ({ key: String(h), label: `${h}:00` }));
@@ -36,12 +43,24 @@ const DAYS_OPTIONS = Array.from({ length: 8 }, (_, d) => ({
     label: d === 0 ? "当日のみ" : `${d}日前から`,
 }));
 
+const MENTION_TYPE_OPTIONS: { key: MentionType; label: string; description: string }[] = [
+    { key: "none", label: "メンションしない", description: "" },
+    { key: "everyone", label: "@everyone", description: "チャンネルの全員に通知" },
+    { key: "here", label: "@here", description: "オンライン中のメンバーにだけ通知" },
+];
+const MENTION_CONDITION_OPTIONS: { key: MentionCondition; label: string }[] = [
+    { key: "urgent", label: "期限切れ・今日が期限のタスクがあるときのみ" },
+    { key: "always", label: "毎回" },
+];
+
 const DEFAULTS: SettingsInput = {
     enabled: true,
     notifyHour: 9,
     dueReminderEnabled: true,
     dueReminderDaysBefore: 1,
     dailyDigestEnabled: true,
+    mentionType: "none",
+    mentionCondition: "urgent",
 };
 
 // チーム / 個人で呼び出す API を切り替える
@@ -102,6 +121,8 @@ export function DiscordSettingsForm({ scope, onDone }: DiscordSettingsFormProps)
                 dueReminderEnabled: s.dueReminderEnabled,
                 dueReminderDaysBefore: s.dueReminderDaysBefore,
                 dailyDigestEnabled: s.dailyDigestEnabled,
+                mentionType: s.mentionType,
+                mentionCondition: s.mentionCondition,
             });
         } else {
             setForm(DEFAULTS);
@@ -285,6 +306,42 @@ export function DiscordSettingsForm({ scope, onDone }: DiscordSettingsFormProps)
             >
                 未完了タスクの一覧を毎日通知する
             </Switch>
+
+            <div className="flex flex-col gap-3">
+                <Select
+                    label="メンション"
+                    variant="bordered"
+                    disallowEmptySelection
+                    selectedKeys={[form.mentionType]}
+                    onSelectionChange={(keys) => {
+                        const value = Array.from(keys)[0];
+                        if (value !== undefined) setForm((f) => ({ ...f, mentionType: value as MentionType }));
+                    }}
+                    isDisabled={!form.enabled}
+                    description="チャンネルで @everyone ロールに「@everyone、@here、全てのロールにメンション」権限がないと通知されません"
+                >
+                    {MENTION_TYPE_OPTIONS.map((o) => (
+                        <SelectItem key={o.key} description={o.description || undefined}>
+                            {o.label}
+                        </SelectItem>
+                    ))}
+                </Select>
+                <Select
+                    label="メンションするタイミング"
+                    variant="bordered"
+                    disallowEmptySelection
+                    selectedKeys={[form.mentionCondition]}
+                    onSelectionChange={(keys) => {
+                        const value = Array.from(keys)[0];
+                        if (value !== undefined) setForm((f) => ({ ...f, mentionCondition: value as MentionCondition }));
+                    }}
+                    isDisabled={!form.enabled || form.mentionType === "none"}
+                >
+                    {MENTION_CONDITION_OPTIONS.map((o) => (
+                        <SelectItem key={o.key}>{o.label}</SelectItem>
+                    ))}
+                </Select>
+            </div>
 
             <div className="flex flex-wrap justify-end gap-2 mt-2">
                 {isConfigured && (

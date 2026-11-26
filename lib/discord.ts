@@ -36,10 +36,13 @@ export type DiscordEmbed = {
 
 export type DiscordPayload = {
     username?: string;
-    content?: string;
     embeds?: DiscordEmbed[];
-    allowed_mentions?: { parse: string[] };
 };
+
+export const MENTION_TYPES = ["none", "everyone", "here"] as const;
+export type MentionType = (typeof MENTION_TYPES)[number];
+export const MENTION_CONDITIONS = ["always", "urgent"] as const;
+export type MentionCondition = (typeof MENTION_CONDITIONS)[number];
 
 export type SendResult =
     | { ok: true }
@@ -47,28 +50,37 @@ export type SendResult =
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function postOnce(url: string, payload: DiscordPayload) {
+async function postOnce(url: string, payload: DiscordPayload, mention: MentionType) {
+    // メンションは embed 内では通知されないため content に入れる。
+    // allowed_mentions で許可するのは設定で選ばれたものだけにし、それ以外は一切飛ばさない
+    const mentionBody =
+        mention === "none"
+            ? { allowed_mentions: { parse: [] } }
+            : { content: `@${mention}`, allowed_mentions: { parse: ["everyone"] } };
     return fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
             username: "graphly-task",
             ...payload,
-            // @everyone 等のメンションは絶対に飛ばさない
-            allowed_mentions: { parse: [] },
+            ...mentionBody,
         }),
         signal: AbortSignal.timeout(10_000),
     });
 }
 
-export async function sendDiscordWebhook(url: string, payload: DiscordPayload): Promise<SendResult> {
+export async function sendDiscordWebhook(
+    url: string,
+    payload: DiscordPayload,
+    mention: MentionType = "none"
+): Promise<SendResult> {
     // 念のため送信直前にも検証する
     if (!DISCORD_WEBHOOK_URL_REGEX.test(url)) {
         return { ok: false, status: 400, invalidWebhook: true, message: "Invalid webhook URL" };
     }
 
     try {
-        let res = await postOnce(url, payload);
+        let res = await postOnce(url, payload, mention);
 
         // レート制限: retry_after を1回だけ待って再送
         if (res.status === 429) {
@@ -80,7 +92,7 @@ export async function sendDiscordWebhook(url: string, payload: DiscordPayload): 
                 // ignore
             }
             await sleep(Math.min(Math.max(retryAfterSec, 0), 10) * 1000);
-            res = await postOnce(url, payload);
+            res = await postOnce(url, payload, mention);
         }
 
         if (res.ok) return { ok: true };
@@ -280,6 +292,9 @@ export const discordSettingsSchema = z.object({
     dueReminderEnabled: z.boolean(),
     dueReminderDaysBefore: z.number().int().min(0).max(7),
     dailyDigestEnabled: z.boolean(),
+    // 未指定なら既存の値（新規作成時は DB の初期値）を維持する
+    mentionType: z.enum(MENTION_TYPES).optional(),
+    mentionCondition: z.enum(MENTION_CONDITIONS).optional(),
 });
 
 export type DiscordSettings = {
@@ -289,7 +304,17 @@ export type DiscordSettings = {
     dueReminderEnabled: boolean;
     dueReminderDaysBefore: number;
     dailyDigestEnabled: boolean;
+    mentionType: MentionType;
+    mentionCondition: MentionCondition;
 };
+
+export function toMentionType(value: string): MentionType {
+    return (MENTION_TYPES as readonly string[]).includes(value) ? (value as MentionType) : "none";
+}
+
+export function toMentionCondition(value: string): MentionCondition {
+    return (MENTION_CONDITIONS as readonly string[]).includes(value) ? (value as MentionCondition) : "urgent";
+}
 
 // クライアントには webhook URL の全文を返さない
 export function toDiscordSettings(row: {
@@ -299,6 +324,8 @@ export function toDiscordSettings(row: {
     dueReminderEnabled: boolean;
     dueReminderDaysBefore: number;
     dailyDigestEnabled: boolean;
+    mentionType: string;
+    mentionCondition: string;
 }): DiscordSettings {
     return {
         webhookUrlMasked: maskWebhookUrl(row.webhookUrl),
@@ -307,5 +334,7 @@ export function toDiscordSettings(row: {
         dueReminderEnabled: row.dueReminderEnabled,
         dueReminderDaysBefore: row.dueReminderDaysBefore,
         dailyDigestEnabled: row.dailyDigestEnabled,
+        mentionType: toMentionType(row.mentionType),
+        mentionCondition: toMentionCondition(row.mentionCondition),
     };
 }
