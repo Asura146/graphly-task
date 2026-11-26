@@ -7,9 +7,12 @@ import {
     buildTestEmbed,
     DiscordEmbed,
     NotificationContext,
+    MentionType,
     NotificationTask,
     sendDiscordWebhook,
     SendResult,
+    toMentionCondition,
+    toMentionType,
 } from "@/lib/discord";
 
 type DiscordWebhook = typeof discordWebhooks.$inferSelect;
@@ -98,7 +101,20 @@ async function fetchTargetTasks(webhook: DiscordWebhook, today: string, baseUrl:
     });
 }
 
-async function buildScheduledEmbeds(webhook: DiscordWebhook, today: string): Promise<DiscordEmbed[]> {
+const MENTION_LABELS: Record<MentionType, string> = { none: "なし", everyone: "@everyone", here: "@here" };
+
+// 設定に応じて、今回の送信でメンションするかを決める
+function resolveMention(webhook: DiscordWebhook, hasUrgent: boolean): MentionType {
+    const type = toMentionType(webhook.mentionType);
+    if (type === "none") return "none";
+    if (toMentionCondition(webhook.mentionCondition) === "urgent" && !hasUrgent) return "none";
+    return type;
+}
+
+async function buildScheduledEmbeds(
+    webhook: DiscordWebhook,
+    today: string
+): Promise<{ embeds: DiscordEmbed[]; hasUrgent: boolean }> {
     const baseUrl = getBaseUrl();
     const ctx: NotificationContext = {
         scope: webhook.teamId ? "team" : "user",
@@ -117,7 +133,9 @@ async function buildScheduledEmbeds(webhook: DiscordWebhook, today: string): Pro
         const embed = buildDailyDigestEmbed(targetTasks, ctx);
         if (embed) embeds.push(embed);
     }
-    return embeds;
+    // 期限切れ or 今日が期限のタスクがあるか
+    const hasUrgent = targetTasks.some((t) => t.daysUntilDue !== null && t.daysUntilDue <= 0);
+    return { embeds, hasUrgent };
 }
 
 // ---------------------------------------------------------------------------
@@ -135,12 +153,18 @@ export async function sendTestNotification(webhook: DiscordWebhook): Promise<Sen
                 : `オン（${webhook.dueReminderDaysBefore}日前から）`
             : "オフ"}`,
         `タスク一覧: ${webhook.dailyDigestEnabled ? "オン" : "オフ"}`,
+        `メンション: ${MENTION_LABELS[toMentionType(webhook.mentionType)]}${toMentionType(webhook.mentionType) === "none"
+            ? ""
+            : toMentionCondition(webhook.mentionCondition) === "urgent"
+                ? "（期限切れ・当日期限があるときのみ）"
+                : "（毎回）"}`,
     ];
     const embed = buildTestEmbed(
         { scope: webhook.teamId ? "team" : "user", ownerName, baseUrl: getBaseUrl() },
         lines.join("\n")
     );
-    return sendDiscordWebhook(webhook.webhookUrl, { embeds: [embed] });
+    // メンションが届くか確認できるよう、テスト送信では条件に関わらずメンションを付ける
+    return sendDiscordWebhook(webhook.webhookUrl, { embeds: [embed] }, toMentionType(webhook.mentionType));
 }
 
 // ---------------------------------------------------------------------------
@@ -186,13 +210,17 @@ export async function runScheduledNotifications(now: Date = new Date()): Promise
                 .returning({ id: discordWebhooks.id });
             if (!claimed) continue;
 
-            const embeds = await buildScheduledEmbeds(webhook, today);
+            const { embeds, hasUrgent } = await buildScheduledEmbeds(webhook, today);
             if (embeds.length === 0) {
                 summary.skippedEmpty++;
                 continue;
             }
 
-            const result = await sendDiscordWebhook(webhook.webhookUrl, { embeds });
+            const result = await sendDiscordWebhook(
+                webhook.webhookUrl,
+                { embeds },
+                resolveMention(webhook, hasUrgent)
+            );
             if (result.ok) {
                 summary.sent++;
                 continue;

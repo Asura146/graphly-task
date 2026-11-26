@@ -166,6 +166,8 @@ export const discordWebhooks = pgTable("discord_webhooks", {
   dueReminderEnabled: boolean("due_reminder_enabled").default(true).notNull(),
   dueReminderDaysBefore: integer("due_reminder_days_before").default(1).notNull(), // 0-7
   dailyDigestEnabled: boolean("daily_digest_enabled").default(true).notNull(),
+  mentionType: text("mention_type").default("none").notNull(), // none | everyone | here
+  mentionCondition: text("mention_condition").default("urgent").notNull(), // always | urgent
   lastNotifiedDate: text("last_notified_date"), // YYYY-MM-DD (JST)
 
   createdAt: timestamp("created_at").defaultNow().notNull(),
